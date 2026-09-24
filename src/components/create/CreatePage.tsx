@@ -58,7 +58,6 @@ export function CreatePage() {
       <GenerationQueue
         queue={queue}
         onRemove={(id) => useCreateStore.getState().removeFromQueue(id)}
-        onView={(job) => console.log("View job", job)}
       />
     </section>
   );
