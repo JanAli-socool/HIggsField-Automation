@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, ScrollRestoration } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Header } from "./components/layout/Header";
 import { Footer } from "./components/layout/Footer";
 import { Hero } from "./components/landing/Hero";
@@ -11,6 +11,7 @@ import { CreatePage } from "./components/create/CreatePage";
 import { Toaster } from "./components/ui/Toast";
 import { useCreateStore } from "./stores/useCreateStore";
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 
 function HomePage() {
   return (
@@ -32,14 +33,43 @@ function CreatePageWrapper() {
   return <CreatePage />;
 }
 
+function ScrollRestorationWrapper() {
+  useEffect(() => {
+    const scrollPositions = new Map<string, number>();
+
+    const saveScrollPosition = () => {
+      scrollPositions.set(window.location.pathname, window.scrollY);
+    };
+
+    const restoreScrollPosition = () => {
+      const savedPosition = scrollPositions.get(window.location.pathname);
+      if (savedPosition !== undefined) {
+        window.scrollTo(0, savedPosition);
+      } else {
+        window.scrollTo(0, 0);
+      }
+    };
+
+    window.addEventListener("beforeunload", saveScrollPosition);
+    window.addEventListener("popstate", restoreScrollPosition);
+
+    return () => {
+      window.removeEventListener("beforeunload", saveScrollPosition);
+      window.removeEventListener("popstate", restoreScrollPosition);
+    };
+  }, []);
+
+  return null;
+}
+
 function AppRoutes() {
   const toasts = useCreateStore((state) => state.queue.filter(j => j.status === "completed" || j.status === "failed").length);
   
   return (
     <>
       <Header />
+      <ScrollRestorationWrapper />
       <main id="main-content">
-        <ScrollRestoration />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/effects" element={<EffectsPage />} />
