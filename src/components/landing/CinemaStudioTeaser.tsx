@@ -15,6 +15,9 @@ const features = [
   { icon: Film, title: "Multi-Model Native", desc: "Seedance, Veo, Kling, Sora — pick engine per shot." },
 ];
 
+// Cinema Studio placeholder - base64 encoded SVG
+const cinemaPlaceholder = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIwIDEwODAiIGZpbGw9Im5vbmUiPgogPHJlY3Qgd2lkdGg9IjE5MjAiIGhlaWdodD0iMTA4MCIgZmlsbD0iIzE0MTQxRSIvPgogPHJlY3QgeD0iMjAwIiB5PSIxNTAiIHdpZHRoPSIxNTIwIiBoZWlnaHQ9Ijc4MCIgcng9IjI0IiBmaWxsPSIjMGEwQTAxIiBzdHJva2U9IiNBOBU1RjciIHN0cm9rZS13aWR0aD0iMiIgb3BhY2l0eT0iMC4zIi8+CiA8cmVjdCB4PSIzMDAiIHk9IjI1MCIgd2lkdGg9IjEzMjAiIGhlaWdodD0iNTgwIiByeD0iMTYiIGZpbGw9IiMwQTBBMDEiIHN0cm9rZT0iIzA2QjZENCIgc3Ryb2tlLXdpZHRoPSIxIiBvcGFjaXR5PSIwLjMiLz4KIDxjaXJjbGUgY3g9Ijk2MCIgY3k9IjU0MCIgcj0iMTgwIiBmaWxsPSIjQTg1NUY3IiBvcGFjaXR5PSIwLjA1Ii8+CiA8dGV4dCB4PSI5NjAiIHk9IjUyMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSIgZm9udC1zaXplPSI0OCIgZm9udC13ZWlnaHQ9IjcwMCIgZmlsbD0iI0E4NTVGNyIgb3BhY2l0eT0iMC4zIj5DSU5FTVMgU1RVREk8L3RleHQ+CiA8dGV4dCB4PSI5NjAiIHk9IjU4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk0QTNCOCIgb3BhY2l0eT0iMC41Ij5BSSBGbGxtYWtpbmcgV29ya3NwYWNlPC90ZXh0PgogPHJlY3QgeD0iOTIwIiB5PSI2NTAiIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgcng9IjEyIiBmaWxsPSIjQTg1NUY3IiBvcGFjaXR5PSIwLjIiLz4KIDxwYXRoIGQ9Ik05MzUgNjkwTDk2MCA3MTVMMzk1IDY2NSIgc3Ryb2tlPSIjQTg1NUY3IiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgo8L3N2Zz4=";
+
 export function CinemaStudioTeaser() {
   return (
     <section className="py-16 lg:py-24 bg-surface/50 border-y border-border">
@@ -72,7 +75,8 @@ export function CinemaStudioTeaser() {
             <div className="relative aspect-video rounded-2xl overflow-hidden bg-surface border border-border">
               <VideoPlayer
                 src="/videos/cinema-studio-demo.webm"
-                poster="/videos/cinema-studio-poster.jpg"
+                poster={cinemaPlaceholder}
+                fallback={cinemaPlaceholder}
                 className="w-full h-full object-cover"
                 autoPlay
                 loop

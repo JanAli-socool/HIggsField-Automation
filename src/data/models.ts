@@ -1,11 +1,22 @@
 import type { Model, ModelCapability } from "../types";
 
+const createModelPlaceholder = (hue: number, name: string) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" fill="none">
+    <rect width="400" height="225" fill="hsl(${hue}, 30%, 12%)"/>
+    <rect x="50" y="40" width="300" height="145" rx="12" fill="hsl(${hue}, 25%, 10%)" stroke="hsl(${hue}, 30%, 22%)" stroke-width="1"/>
+    <circle cx="200" cy="112.5" r="32" fill="hsl(${hue}, 60%, 45%)" opacity="0.15"/>
+    <text x="200" y="115" text-anchor="middle" font-family="system-ui" font-size="16" font-weight="600" fill="hsl(${hue}, 60%, 55%)">${name}</text>
+    <text x="200" y="140" text-anchor="middle" font-family="system-ui" font-size="11" fill="hsl(${hue}, 20%, 50%)">AI Video Model</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
 export const models: Model[] = [
   {
     id: "seedance-2-5",
     name: "Seedance 2.5",
     tagline: "The most advanced video model",
-    thumbnailUrl: "/models/seedance-2-5.jpg",
+    thumbnailUrl: createModelPlaceholder(270, "Seedance 2.5"),
     capabilities: ["4k", "1min", "character-consistency", "camera-control"],
     maxDuration: "60s",
     resolution: "4K",
@@ -16,7 +27,7 @@ export const models: Model[] = [
     id: "nano-banana-pro",
     name: "Nano Banana Pro",
     tagline: "Generate high-quality visuals",
-    thumbnailUrl: "/models/nano-banana-pro.jpg",
+    thumbnailUrl: createModelPlaceholder(180, "Nano Banana Pro"),
     capabilities: ["4k", "character-consistency", "upscale"],
     maxDuration: "10s",
     resolution: "4K",
@@ -27,7 +38,7 @@ export const models: Model[] = [
     id: "genjutsu",
     name: "Higgsfield Genjutsu",
     tagline: "Reality Manipulation",
-    thumbnailUrl: "/models/genjutsu.jpg",
+    thumbnailUrl: createModelPlaceholder(320, "Genjutsu"),
     capabilities: ["camera-control", "multi-model", "real-time"],
     maxDuration: "15s",
     resolution: "1080p",
@@ -38,7 +49,7 @@ export const models: Model[] = [
     id: "cinema-studio-4",
     name: "Cinema Studio 4.0",
     tagline: "Create cinematic scenes effortlessly",
-    thumbnailUrl: "/models/cinema-studio-4.jpg",
+    thumbnailUrl: createModelPlaceholder(280, "Cinema Studio 4.0"),
     capabilities: ["4k", "1min", "character-consistency", "lip-sync", "camera-control", "multi-model"],
     maxDuration: "60s",
     resolution: "4K",
@@ -49,7 +60,7 @@ export const models: Model[] = [
     id: "gpt-6-astra",
     name: "GPT-6 Astra",
     tagline: "Supercomputer Agent",
-    thumbnailUrl: "/models/gpt-6-astra.jpg",
+    thumbnailUrl: createModelPlaceholder(300, "GPT-6 Astra"),
     capabilities: ["multi-model", "real-time", "camera-control"],
     maxDuration: "30s",
     resolution: "4K",
@@ -60,7 +71,7 @@ export const models: Model[] = [
     id: "kling-3",
     name: "Kling 3.0",
     tagline: "Action & Motion Master",
-    thumbnailUrl: "/models/kling-3.jpg",
+    thumbnailUrl: createModelPlaceholder(200, "Kling 3.0"),
     capabilities: ["4k", "1min", "camera-control", "character-consistency"],
     maxDuration: "60s",
     resolution: "4K",
@@ -71,7 +82,7 @@ export const models: Model[] = [
     id: "veo-3-1",
     name: "Google Veo 3.1",
     tagline: "Cinematic Quality",
-    thumbnailUrl: "/models/veo-3-1.jpg",
+    thumbnailUrl: createModelPlaceholder(220, "Veo 3.1"),
     capabilities: ["4k", "1min", "character-consistency", "lip-sync"],
     maxDuration: "60s",
     resolution: "4K",
@@ -82,7 +93,7 @@ export const models: Model[] = [
     id: "sora-2",
     name: "Sora 2",
     tagline: "OpenAI's Video Model",
-    thumbnailUrl: "/models/sora-2.jpg",
+    thumbnailUrl: createModelPlaceholder(240, "Sora 2"),
     capabilities: ["4k", "1min", "character-consistency", "camera-control", "multi-model"],
     maxDuration: "60s",
     resolution: "4K",
