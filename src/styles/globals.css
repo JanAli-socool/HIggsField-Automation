@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0A0A0F;
+  --color-surface: #14141E;
+  --color-border: #2A2A3A;
+  --color-primary: #A855F7;
+  --color-primary-hover: #9333EA;
+  --color-secondary: #06B6D4;
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  --radius-lg: 12px;
+  --shadow-elevated: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply scroll-smooth;
+  }
+  body {
+    @apply bg-bg text-text-primary font-body antialiased;
+  }
+  ::selection {
+    @apply bg-primary/30 text-text-primary;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-bg;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer components {
+  .container {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  .section {
+    @apply py-16 sm:py-24 lg:py-32;
+  }
+}
