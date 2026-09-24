@@ -1,4 +1,4 @@
-import type { Effect } from "../../types";
+import type { Effect, GenerationJob } from "../../types";
 import { Badge } from "../ui/Badge";
 import { VideoPlayer } from "../ui/VideoPlayer";
 import { Button } from "../ui/Button";
@@ -6,6 +6,7 @@ import { Drawer } from "../ui/Drawer";
 import { motion } from "framer-motion";
 import { X, Play, Download, Share2, ExternalLink, Sparkles, Zap, Crown, Loader2 } from "lucide-react";
 import { useCreateStore } from "../../stores/useCreateStore";
+import { useState } from "react";
 
 interface EffectDetailDrawerProps {
   effect: Effect | null;
@@ -52,16 +53,16 @@ export function EffectDetailDrawer({ effect, isOpen, onClose }: EffectDetailDraw
         modelId: effect.model.toLowerCase().replace(/\s+/g, "-"),
         effectId: effect.id,
         assets: {
-          character: { type: "character", file: null, preview: null },
-          location: { type: "location", file: null, preview: null },
-          product: { type: "product", file: null, preview: null },
+          character: { type: "character", file: null, preview: null, url: null },
+          location: { type: "location", file: null, preview: null, url: null },
+          product: { type: "product", file: null, preview: null, url: null },
         },
         resolution: effect.resolution.toLowerCase() as any,
         aspectRatio: "9:16",
       },
       status: "queued",
       progress: 0,
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
     });
 
     // Simulate generation
@@ -69,7 +70,7 @@ export function EffectDetailDrawer({ effect, isOpen, onClose }: EffectDetailDraw
       useCreateStore.getState().updateJob(jobId, { status: "processing", progress: 10 });
       const interval = setInterval(() => {
         const state = useCreateStore.getState();
-        const job = state.queue.find((j) => j.id === jobId);
+        const job = state.queue.find((j: GenerationJob) => j.id === jobId);
         if (!job || job.status !== "processing") {
           clearInterval(interval);
           setIsGeneratingEffect(false);
@@ -178,5 +179,3 @@ export function EffectDetailDrawer({ effect, isOpen, onClose }: EffectDetailDraw
     </Drawer>
   );
 }
-
-import { useState } from "react";

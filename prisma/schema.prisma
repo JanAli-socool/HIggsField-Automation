@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatarUrl     String?
+  passwordHash  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  projects      Project[]
+  generations   Generation[]
+  credits       CreditBalance?
+  sessions      Session[]
+  apiKeys       ApiKey[]
+
+  @@index([email])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  keyHash   String
+  lastUsed  DateTime?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Project {
+  id          String       @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generations Generation[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Generation {
+  id                  String   @id @default(cuid())
+  userId              String
+  projectId           String?
+  mediaType           String
+  model               String
+  originalPrompt      String
+  enhancedPrompt      String?
+  negativePrompt      String?
+  status              String   @default("queued")
+  progress            Int      @default(0)
+  inputAssetUrl       String?
+  maskUrl             String?
+  firstFrameImageUrl  String?
+  lastFrameImageUrl   String?
+  outputAssetUrls     String[]
+  thumbnailUrls       String[]
+  parameters          Json
+  providerJobId       String?
+  creditCost          Int      @default(0)
+  errorMessage        String?
+  failureType         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  completedAt         DateTime?
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project             Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([mediaType])
+}
+
+model CreditBalance {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  balance        Int      @default(0)
+  totalPurchased Int      @default(0)
+  totalConsumed  Int      @default(0)
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions   CreditTransaction[]
+
+  @@index([userId])
+}
+
+model CreditTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  balanceId   String
+  amount      Int
+  type        String
+  description String?
+  generationId String?
+  createdAt   DateTime @default(now())
+  balance     CreditBalance @relation(fields: [balanceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([balanceId])
+  @@index([createdAt])
+}
+
+model Upload {
+  id        String   @id @default(cuid())
+  userId    String
+  url       String
+  type      String
+  size      Int
+  width     Int?
+  height    Int?
+  duration  Float?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RateLimit {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  count     Int      @default(0)
+  window    Int
+  resetAt   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([resetAt])
+}

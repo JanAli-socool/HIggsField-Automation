@@ -6,7 +6,7 @@ import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
 import { useCreateStore } from "../../stores/useCreateStore";
 import { motion } from "framer-motion";
-import { Sparkles, Play, ArrowLeft, ChevronDown, Image as ImageIcon, Video as VideoIcon, Settings } from "lucide-react";
+import { Sparkles, Play, ArrowLeft, ChevronDown, Image as ImageIcon, Video as VideoIcon, Settings, Loader2 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useState } from "react";
 
@@ -22,8 +22,27 @@ export function TemplateMode() {
     setResolution,
     aspectRatio,
     setAspectRatio,
-    addToQueue,
+    quality,
+    setQuality,
+    steps,
+    setSteps,
+    guidanceScale,
+    setGuidanceScale,
+    seed,
+    setSeed,
+    durationSeconds,
+    setDurationSeconds,
+    fps,
+    setFps,
+    motionStrength,
+    setMotionStrength,
+    cameraMotion,
+    setCameraMotion,
+    numOutputs,
+    setNumOutputs,
+    generate,
     isGenerating,
+    error,
   } = useCreateStore();
 
   const [activeCategory, setActiveCategory] = useState<typeof categories[0]["id"]>("all");
@@ -35,45 +54,6 @@ export function TemplateMode() {
 
   const effect = selectedEffectId ? effects.find((e) => e.id === selectedEffectId) : null;
 
-  const handleGenerate = () => {
-    if (!effect) return;
-
-    const jobId = `gen-${Date.now()}`;
-    addToQueue({
-      id: jobId,
-      request: {
-        mode: "template",
-        prompt: effect.prompt,
-        modelId,
-        effectId: effect.id,
-        assets,
-        resolution,
-        aspectRatio,
-      },
-      status: "queued",
-      progress: 0,
-      createdAt: new Date(),
-    });
-
-    setTimeout(() => {
-      useCreateStore.getState().updateJob(jobId, { status: "processing", progress: 10 });
-      const interval = setInterval(() => {
-        const state = useCreateStore.getState();
-        const job = state.queue.find((j) => j.id === jobId);
-        if (!job || job.status !== "processing") {
-          clearInterval(interval);
-          return;
-        }
-        if (job.progress >= 90) {
-          clearInterval(interval);
-          state.updateJob(jobId, { status: "completed", progress: 100, resultUrl: "/videos/result.webm" });
-        } else {
-          state.updateJob(jobId, { progress: job.progress + Math.random() * 15 });
-        }
-      }, 500);
-    }, 500);
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -82,6 +62,16 @@ export function TemplateMode() {
           <Badge variant="default" size="sm">Template Mode</Badge>
         </div>
       </div>
+
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-sm"
+        >
+          {error}
+        </motion.div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -164,7 +154,7 @@ export function TemplateMode() {
                 <Button
                   variant="outline"
                   className="w-full justify-between"
-                  onClick={() => {}}
+                  disabled={isGenerating}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-6 bg-surface rounded-lg overflow-hidden relative">
@@ -172,7 +162,7 @@ export function TemplateMode() {
                     </div>
                     <div>
                       <p className="font-medium text-text-primary">
-                        {models.find((m) => m.id === modelId)?.name || "Seedance 2.5"}
+                        {models.find((m) => m.id === modelId)?.name || "Wan 2.1"}
                       </p>
                       <p className="text-xs text-text-muted">Auto-selected for effect</p>
                     </div>
@@ -190,6 +180,7 @@ export function TemplateMode() {
                       variant={resolution === res ? "primary" : "outline"}
                       size="sm"
                       onClick={() => setResolution(res as any)}
+                      disabled={isGenerating}
                       className="py-2"
                     >
                       {res.toUpperCase()}
@@ -200,17 +191,19 @@ export function TemplateMode() {
 
               <div>
                 <label className="block font-medium text-text-primary mb-3">Aspect Ratio</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {[
                     { value: "16:9", label: "16:9", icon: <VideoIcon className="w-4 h-4" /> },
                     { value: "9:16", label: "9:16", icon: <ImageIcon className="w-4 h-4" /> },
                     { value: "1:1", label: "1:1", icon: <Settings className="w-4 h-4" /> },
+                    { value: "4:3", label: "4:3", icon: <Settings className="w-4 h-4" /> },
                   ].map((ratio) => (
                     <Button
                       key={ratio.value}
                       variant={aspectRatio === ratio.value ? "primary" : "outline"}
                       size="sm"
                       onClick={() => setAspectRatio(ratio.value as any)}
+                      disabled={isGenerating}
                       className="py-2 flex items-center justify-center gap-1.5"
                     >
                       {ratio.icon}
@@ -220,16 +213,150 @@ export function TemplateMode() {
                 </div>
               </div>
 
+              <div>
+                <label className="block font-medium text-text-primary mb-3">Quality</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {["preview", "standard", "high"].map((q) => (
+                    <Button
+                      key={q}
+                      variant={quality === q ? "primary" : "outline"}
+                      size="sm"
+                      onClick={() => setQuality(q as any)}
+                      disabled={isGenerating}
+                      className="py-2 capitalize"
+                    >
+                      {q}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-medium text-text-primary mb-3">Duration (seconds)</label>
+                  <input
+                    type="number"
+                    value={durationSeconds}
+                    onChange={(e) => setDurationSeconds(parseInt(e.target.value) || 5)}
+                    min="1"
+                    max="30"
+                    step="1"
+                    disabled={isGenerating}
+                    className="w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-text-primary mb-3">FPS</label>
+                  <input
+                    type="number"
+                    value={fps}
+                    onChange={(e) => setFps(parseInt(e.target.value) || 24)}
+                    min="8"
+                    max="60"
+                    step="1"
+                    disabled={isGenerating}
+                    className="w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-medium text-text-primary mb-3">Motion Strength</label>
+                  <input
+                    type="range"
+                    value={motionStrength}
+                    onChange={(e) => setMotionStrength(parseFloat(e.target.value))}
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    disabled={isGenerating}
+                    className="w-full h-2 bg-border appearance-none rounded-lg accent-primary"
+                  />
+                  <p className="text-sm text-text-muted mt-1">{Math.round(motionStrength * 100)}%</p>
+                </div>
+                <div>
+                  <label className="block font-medium text-text-primary mb-3">Camera Motion</label>
+                  <select
+                    value={cameraMotion}
+                    onChange={(e) => setCameraMotion(e.target.value)}
+                    disabled={isGenerating}
+                    className="w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    {[
+                      "none",
+                      "pan_left",
+                      "pan_right",
+                      "tilt_up",
+                      "tilt_down",
+                      "zoom_in",
+                      "zoom_out",
+                      "dolly_in",
+                      "dolly_out",
+                      "orbit",
+                      "tracking",
+                      "handheld",
+                    ].map((motion) => (
+                      <option key={motion} value={motion}>
+                        {motion.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-medium text-text-primary mb-3">Number of Outputs</label>
+                  <input
+                    type="number"
+                    value={numOutputs}
+                    onChange={(e) => setNumOutputs(parseInt(e.target.value) || 1)}
+                    min="1"
+                    max="4"
+                    step="1"
+                    disabled={isGenerating}
+                    className="w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-text-primary mb-3">Seed (optional)</label>
+                  <input
+                    type="number"
+                    value={seed || ""}
+                    onChange={(e) => setSeed(e.target.value ? parseInt(e.target.value) : null)}
+                    min="0"
+                    max="2147483647"
+                    step="1"
+                    disabled={isGenerating}
+                    className="w-full px-4 py-2.5 bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="Random"
+                  />
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-border">
                 <Button
                   size="lg"
                   className="w-full justify-center gap-2"
-                  onClick={handleGenerate}
+                  onClick={() => generate("template", effect.id)}
                   disabled={isGenerating}
                 >
-                  <Play className="w-5 h-5" />
-                  Generate with Effect
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-5 h-5" />
+                      Generate with Effect
+                    </>
+                  )}
                 </Button>
+                <p className="text-center text-xs text-text-muted mt-2">
+                  Estimated cost: ~12 credits
+                </p>
               </div>
             </>
           ) : (

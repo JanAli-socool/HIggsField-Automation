@@ -12,6 +12,7 @@ import { Toaster } from "./components/ui/Toast";
 import { useCreateStore } from "./stores/useCreateStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
+import type { GenerationJob } from "./types";
 
 function HomePage() {
   return (
@@ -63,7 +64,9 @@ function ScrollRestorationWrapper() {
 }
 
 function AppRoutes() {
-  const toasts = useCreateStore((state) => state.queue.filter(j => j.status === "completed" || j.status === "failed").length);
+  const toasts = useCreateStore((state) => 
+    state.queue.filter((j: GenerationJob) => j.status === "completed" || j.status === "failed").length
+  );
   
   return (
     <>
