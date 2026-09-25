@@ -43,41 +43,53 @@ function getPlaceholderUrl(mediaType: string, index: number = 0): string {
   return PLACEHOLDER_VIDEOS[index % PLACEHOLDER_VIDEOS.length]
 }
 
-function simulateProgress(
-  jobId: string,
+function isServerless(): boolean {
+  return !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.NETLIFY
+}
+
+function simulateProgressSync(
   mediaType: string,
   onProgress: (status: JobStatus, progress: number) => void
-): Promise<void> {
+): void {
+  if (isServerless()) {
+    // In serverless, complete immediately
+    onProgress("validating_input", 5)
+    onProgress("preparing_model", 15)
+    onProgress("generating", 50)
+    onProgress("generating", 90)
+    onProgress("encoding", 95)
+    onProgress("uploading", 98)
+    onProgress("completed", 100)
+    return
+  }
+
+  // Local development - use async simulation
   const totalTime = MOCK_DELAYS[mediaType] || 5000
   const stages: { status: JobStatus; progress: number; duration: number }[] = [
     { status: "validating_input", progress: 5, duration: totalTime * 0.05 },
     { status: "preparing_model", progress: 15, duration: totalTime * 0.1 },
-    { status: "generating", progress: 90, duration: totalTime * 0.75 },
+    { status: "generating", progress: 50, duration: totalTime * 0.3 },
+    { status: "generating", progress: 90, duration: totalTime * 0.45 },
     { status: "encoding", progress: 95, duration: totalTime * 0.05 },
     { status: "uploading", progress: 98, duration: totalTime * 0.03 },
     { status: "completed", progress: 100, duration: totalTime * 0.02 },
   ]
 
-  return new Promise((resolve) => {
-    let currentStage = 0
+  let currentStage = 0
 
-    const runStage = () => {
-      if (currentStage >= stages.length) {
-        resolve()
-        return
-      }
+  const runStage = () => {
+    if (currentStage >= stages.length) return
 
-      const stage = stages[currentStage]
-      onProgress(stage.status, stage.progress)
+    const stage = stages[currentStage]
+    onProgress(stage.status, stage.progress)
 
-      setTimeout(() => {
-        currentStage++
-        runStage()
-      }, stage.duration)
-    }
+    setTimeout(() => {
+      currentStage++
+      runStage()
+    }, stage.duration)
+  }
 
-    runStage()
-  })
+  runStage()
 }
 
 export class MockProvider extends BaseProvider implements GenerationProvider {
@@ -167,29 +179,43 @@ export class MockProvider extends BaseProvider implements GenerationProvider {
 
     const jobId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
     const now = new Date().toISOString()
+    const params = validation.resolved_parameters
+
+    // Generate result URLs immediately
+    const resultUrls: string[] = []
+    const thumbnailUrls: string[] = []
+
+    for (let i = 0; i < params.num_outputs; i++) {
+      resultUrls.push(getPlaceholderUrl(params.media_type, i))
+      thumbnailUrls.push(getPlaceholderUrl(params.media_type, i))
+    }
 
     const job: GenerationJob = {
-      id: `mock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      id: jobId,
       user_id: "mock_user",
       project_id: request.project_id || null,
-      status: "queued",
-      progress: 0,
+      status: "completed",
+      progress: 100,
       request,
-      result_urls: [],
-      thumbnail_urls: [],
+      result_urls: resultUrls,
+      thumbnail_urls: thumbnailUrls,
       credit_cost: validation.estimated_credits,
       created_at: now,
       updated_at: now,
+      completed_at: now,
     }
 
     MOCK_JOBS.set(jobId, job)
 
-    this.processJob(jobId, validation.resolved_parameters)
+    // Simulate progress for local dev (non-blocking)
+    if (!isServerless()) {
+      this.simulateProgressAsync(jobId, params).catch(console.error)
+    }
 
     return job
   }
 
-  private async processJob(jobId: string, params: GenerationParameters): Promise<void> {
+  private async simulateProgressAsync(jobId: string, params: GenerationParameters): Promise<void> {
     const job = MOCK_JOBS.get(jobId)
     if (!job) return
 
@@ -200,40 +226,18 @@ export class MockProvider extends BaseProvider implements GenerationProvider {
       }
     }
 
-    try {
-      await simulateProgress(jobId, params.media_type, updateStatus)
+    simulateProgressSync(params.media_type, updateStatus)
 
-      const resultUrls: string[] = []
-      const thumbnailUrls: string[] = []
-
-      for (let i = 0; i < params.num_outputs; i++) {
-        resultUrls.push(getPlaceholderUrl(params.media_type, i))
-        thumbnailUrls.push(getPlaceholderUrl(params.media_type, i))
-      }
-
-      const finalJob = MOCK_JOBS.get(jobId)
-      if (finalJob) {
-        MOCK_JOBS.set(jobId, {
-          ...finalJob,
-          status: "completed",
-          progress: 100,
-          result_urls: resultUrls,
-          thumbnail_urls: thumbnailUrls,
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-      }
-    } catch (error) {
-      const failedJob = MOCK_JOBS.get(jobId)
-      if (failedJob) {
-        MOCK_JOBS.set(jobId, {
-          ...failedJob,
-          status: "failed",
-          error_message: error instanceof Error ? error.message : "Generation failed",
-          failure_type: "generation_failed",
-          updated_at: new Date().toISOString(),
-        })
-      }
+    // Job already has result URLs from submit, just mark as completed
+    const finalJob = MOCK_JOBS.get(jobId)
+    if (finalJob) {
+      MOCK_JOBS.set(jobId, {
+        ...finalJob,
+        status: "completed",
+        progress: 100,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
     }
   }
 
@@ -271,24 +275,32 @@ export class MockProvider extends BaseProvider implements GenerationProvider {
 
     const newJobId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
     const now = new Date().toISOString()
+    const params = originalJob.request.parameters
+
+    const resultUrls: string[] = []
+    const thumbnailUrls: string[] = []
+
+    for (let i = 0; i < params.num_outputs; i++) {
+      resultUrls.push(getPlaceholderUrl(params.media_type, i))
+      thumbnailUrls.push(getPlaceholderUrl(params.media_type, i))
+    }
 
     const newJob: GenerationJob = {
-      id: `mock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      id: newJobId,
       user_id: originalJob.user_id,
       project_id: originalJob.project_id,
-      status: "queued",
-      progress: 0,
+      status: "completed",
+      progress: 100,
       request: originalJob.request,
-      result_urls: [],
-      thumbnail_urls: [],
+      result_urls: resultUrls,
+      thumbnail_urls: thumbnailUrls,
       credit_cost: originalJob.credit_cost,
       created_at: now,
       updated_at: now,
+      completed_at: now,
     }
 
     MOCK_JOBS.set(newJobId, newJob)
-    this.processJob(newJobId, originalJob.request.parameters)
-
     return newJob
   }
 
