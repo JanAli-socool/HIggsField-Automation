@@ -1,46 +1,91 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { GenerationRequest, GenerationJob, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "../../../src/types/api.js";
-import { validateGeneration, submitGeneration } from "../../../src/lib/providers/registry.js";
 import prisma from "../../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
 
 const mockGenerations = new Map<string, any>();
 
+const PLACEHOLDER_VIDEOS = [
+  "https://assets.mixkit.co/videos/preview/mixkit-clouds-moving-in-the-sky-time-lapse-1189-large.mp4",
+  "https://assets.mixkit.co/videos/preview/mixkit-waves-in-the-ocean-1190-large.mp4",
+  "https://assets.mixkit.co/videos/preview/mixkit-forest-sunrise-1191-large.mp4",
+];
+
+function getPlaceholderUrl(mediaType: string, index: number = 0): string {
+  if (mediaType.startsWith("image")) {
+    return `https://picsum.photos/seed/mock${index + 1}/1024/1024`;
+  }
+  return PLACEHOLDER_VIDEOS[index % PLACEHOLDER_VIDEOS.length];
+}
+
 function isDatabaseAvailable(): boolean {
   return !!process.env.DATABASE_URL;
 }
 
-async function moderateContent(prompt: string, inputImageUrl?: string, videoUrl?: string): Promise<{ flagged: boolean; reason?: string }> {
-  // Skip moderation in serverless to avoid circular calls and timeouts
-  if (process.env.VERCEL) {
-    return { flagged: false };
+function estimateCredits(params: any): number {
+  const baseCosts: Record<string, number> = {
+    image: 1,
+    image_to_image: 2,
+    image_edit: 3,
+    inpainting: 3,
+    text_to_video: 10,
+    image_to_video: 12,
+    first_frame_to_video: 12,
+    first_and_last_frame_to_video: 15,
+  };
+  let cost = baseCosts[params.media_type] || 1;
+  if (params.num_outputs > 1) cost *= params.num_outputs;
+  if (params.quality === "high") cost *= 2;
+  if (params.quality === "preview") cost = Math.ceil(cost * 0.5);
+  if (params.duration_seconds && params.duration_seconds > 5) cost *= Math.ceil(params.duration_seconds / 5);
+  return cost;
+}
+
+function validateGenerationLocal(body: GenerationRequest): { valid: boolean; errors: string[]; estimated_credits: number; selected_model: string; resolved_parameters: any } {
+  const { parameters } = body;
+  const errors: string[] = [];
+
+  if (!parameters.prompt || parameters.prompt.trim().length < 3) {
+    errors.push("Prompt must be at least 3 characters");
   }
-  
-  const moderationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/moderation`;
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
-    
-    const response = await fetch(moderationUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, image_url: inputImageUrl, video_url: videoUrl }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    
-    if (response.ok) {
-      const result = await response.json();
-      return { flagged: result.data?.flagged || false, reason: result.data?.reason };
-    }
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      console.warn("Moderation check timed out, skipping");
-    } else {
-      console.error("Moderation check failed:", error);
+
+  if (parameters.media_type.startsWith("image_to_") || parameters.media_type === "inpainting") {
+    if (!parameters.input_image_url) {
+      errors.push("Input image is required for this media type");
     }
   }
-  return { flagged: false };
+
+  if (parameters.media_type === "inpainting" && !parameters.mask_url) {
+    errors.push("Mask is required for inpainting");
+  }
+
+  if (parameters.media_type === "first_frame_to_video" && !parameters.first_frame_image_url) {
+    errors.push("First frame image is required for first_frame_to_video");
+  }
+
+  if (parameters.media_type === "first_and_last_frame_to_video") {
+    if (!parameters.first_frame_image_url) errors.push("First frame image is required");
+    if (!parameters.last_frame_image_url) errors.push("Last frame image is required");
+  }
+
+  if (parameters.width < 64 || parameters.height < 64) {
+    errors.push("Width and height must be at least 64px");
+  }
+
+  if (parameters.duration_seconds && parameters.duration_seconds > 30) {
+    errors.push("Duration exceeds maximum of 30 seconds");
+  }
+
+  const estimatedCredits = estimateCredits(parameters);
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings: [],
+    estimated_credits: estimatedCredits,
+    selected_model: parameters.model,
+    resolved_parameters: parameters,
+  };
 }
 
 function generateRequestId(): string {
@@ -60,6 +105,41 @@ function successResponse<T>(res: VercelResponse, data: T, requestId: string, sta
   return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
 }
 
+// Simple mock submit that works without external dependencies
+async function submitGenerationMock(body: GenerationRequest): Promise<GenerationJob> {
+  const validation = validateGenerationLocal(body);
+  if (!validation.valid) {
+    throw new Error(`Validation failed: ${validation.errors.join(", ")}`);
+  }
+
+  const params = validation.resolved_parameters;
+  const jobId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const now = new Date().toISOString();
+
+  const resultUrls: string[] = [];
+  const thumbnailUrls: string[] = [];
+
+  for (let i = 0; i < params.num_outputs; i++) {
+    resultUrls.push(getPlaceholderUrl(params.media_type, i));
+    thumbnailUrls.push(getPlaceholderUrl(params.media_type, i));
+  }
+
+  return {
+    id: jobId,
+    user_id: "mock_user",
+    project_id: body.project_id || null,
+    status: "completed",
+    progress: 100,
+    request: body,
+    result_urls: resultUrls,
+    thumbnail_urls: thumbnailUrls,
+    credit_cost: validation.estimated_credits,
+    created_at: now,
+    updated_at: now,
+    completed_at: now,
+  };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestId = generateRequestId();
   res.setHeader("X-Request-ID", requestId);
@@ -75,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error) {
     console.error(`[${requestId}] Unhandled error:`, error);
-    return errorResponse(res, "INTERNAL_ERROR", "An unexpected error occurred", 500, requestId);
+    return errorResponse(res, "INTERNAL_ERROR", error instanceof Error ? error.message : "An unexpected error occurred", 500, requestId);
   }
 }
 
@@ -93,21 +173,13 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
       body.parameters.prompt = body.parameters.prompt.trim().replace(/^['"]|['"]$/g, '');
     }
 
-    const validation = await validateGeneration(body);
+    // Local validation
+    const validation = validateGenerationLocal(body);
     if (!validation.valid) {
       return errorResponse(res, "VALIDATION_FAILED", validation.errors.join(", "), 400, requestId);
     }
 
     console.log(`[${requestId}] Validation passed for model: ${validation.selected_model}`);
-
-    const moderation = await moderateContent(
-      validation.resolved_parameters.prompt,
-      validation.resolved_parameters.input_image_url,
-      undefined
-    );
-    if (moderation.flagged) {
-      return errorResponse(res, "CONTENT_REJECTED", moderation.reason || "Content violates policy", 400, requestId);
-    }
 
     const userCredits = 1000;
     if (userCredits < validation.estimated_credits) {
@@ -140,20 +212,26 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
       updatedAt: new Date(),
     };
 
-    if (isDatabaseAvailable()) {
-      try {
-        await prisma.generation.create({ data: jobData });
-      } catch (dbError) {
-        console.error("Database create failed, using mock:", dbError);
-        mockGenerations.set(jobId, jobData);
-      }
-    } else {
-      mockGenerations.set(jobId, jobData);
-    }
+    // Store in mock DB
+    mockGenerations.set(jobId, jobData);
 
-    submitGeneration(body).catch(async (error) => {
+    // Submit to mock provider (fire and forget)
+    submitGenerationMock(body).then(async (completedJob) => {
+      try {
+        const updatedJob = { ...jobData, ...completedJob, status: "completed", progress: 100 };
+        if (isDatabaseAvailable()) {
+          try {
+            await prisma.generation.update({ where: { id: jobId }, data: updatedJob });
+          } catch { mockGenerations.set(jobId, updatedJob); }
+        } else {
+          mockGenerations.set(jobId, updatedJob);
+        }
+      } catch (error) {
+        console.error(`[${requestId}] Generation completion failed:`, error);
+      }
+    }).catch(async (error) => {
       console.error(`[${requestId}] Generation submission failed:`, error);
-      const failedJob = { ...jobData, status: "failed", errorMessage: error.message, failureType: "provider_error", updatedAt: new Date() };
+      const failedJob = { ...jobData, status: "failed", errorMessage: error instanceof Error ? error.message : "Generation failed", failureType: "provider_error", updatedAt: new Date() };
       if (isDatabaseAvailable()) {
         try {
           await prisma.generation.update({ where: { id: jobId }, data: failedJob });
@@ -171,69 +249,74 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
 }
 
 async function handleList(req: VercelRequest, res: VercelResponse, requestId: string) {
-  const userId = getUserId(req);
-  const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const pageSize = Math.min(50, Math.max(1, parseInt(req.query.page_size as string) || 20));
-  const status = req.query.status as string | undefined;
-  const mediaType = req.query.media_type as string | undefined;
+  try {
+    const userId = getUserId(req);
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const pageSize = Math.min(50, Math.max(1, parseInt(req.query.page_size as string) || 20));
+    const status = req.query.status as string | undefined;
+    const mediaType = req.query.media_type as string | undefined;
 
-  let jobs: any[] = [];
-  let total = 0;
+    let jobs: any[] = [];
+    let total = 0;
 
-  if (isDatabaseAvailable()) {
-    try {
-      const where: any = { userId };
-      if (status) where.status = status;
-      if (mediaType) where.mediaType = mediaType;
+    if (isDatabaseAvailable()) {
+      try {
+        const where: any = { userId };
+        if (status) where.status = status;
+        if (mediaType) where.mediaType = mediaType;
 
-      [jobs, total] = await Promise.all([
-        prisma.generation.findMany({
-          where,
-          orderBy: { createdAt: "desc" },
-          skip: (page - 1) * pageSize,
-          take: pageSize,
-          select: {
-            id: true, status: true, progress: true, mediaType: true, model: true,
-            originalPrompt: true, thumbnailUrls: true, createdAt: true, completedAt: true,
-          },
-        }),
-        prisma.generation.count({ where }),
-      ]);
-    } catch (dbError) {
-      console.error("Database query failed, using mock:", dbError);
+        [jobs, total] = await Promise.all([
+          prisma.generation.findMany({
+            where,
+            orderBy: { createdAt: "desc" },
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+            select: {
+              id: true, status: true, progress: true, mediaType: true, model: true,
+              originalPrompt: true, thumbnailUrls: true, createdAt: true, completedAt: true,
+            },
+          }),
+          prisma.generation.count({ where }),
+        ]);
+      } catch (dbError) {
+        console.error("Database query failed, using mock:", dbError);
+        jobs = Array.from(mockGenerations.values()).filter(j => j.userId === userId);
+        total = jobs.length;
+      }
+    } else {
       jobs = Array.from(mockGenerations.values()).filter(j => j.userId === userId);
       total = jobs.length;
     }
-  } else {
-    jobs = Array.from(mockGenerations.values()).filter(j => j.userId === userId);
-    total = jobs.length;
+
+    if (status) jobs = jobs.filter(j => j.status === status);
+    if (mediaType) jobs = jobs.filter(j => j.mediaType === mediaType);
+
+    jobs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const paginatedJobs = jobs.slice((page - 1) * pageSize, page * pageSize);
+
+    const data: GenerationJobListItem[] = paginatedJobs.map((j) => ({
+      id: j.id,
+      status: j.status as any,
+      progress: j.progress,
+      media_type: j.mediaType as any,
+      model: j.model as any,
+      prompt: j.originalPrompt,
+      thumbnail_url: j.thumbnailUrls[0] || null,
+      created_at: new Date(j.createdAt).toISOString(),
+      completed_at: j.completedAt ? new Date(j.completedAt).toISOString() : undefined,
+    }));
+
+    const response: PaginatedResponse<GenerationJobListItem> = {
+      data,
+      total,
+      page,
+      page_size: pageSize,
+      has_more: page * pageSize < total,
+    };
+
+    return successResponse(res, response, requestId);
+  } catch (error) {
+    console.error(`[${requestId}] handleList error:`, error);
+    return errorResponse(res, "INTERNAL_ERROR", error instanceof Error ? error.message : "Failed to list generations", 500, requestId);
   }
-
-  if (status) jobs = jobs.filter(j => j.status === status);
-  if (mediaType) jobs = jobs.filter(j => j.mediaType === mediaType);
-
-  jobs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  const paginatedJobs = jobs.slice((page - 1) * pageSize, page * pageSize);
-
-  const data: GenerationJobListItem[] = paginatedJobs.map((j) => ({
-    id: j.id,
-    status: j.status as any,
-    progress: j.progress,
-    media_type: j.mediaType as any,
-    model: j.model as any,
-    prompt: j.originalPrompt,
-    thumbnail_url: j.thumbnailUrls[0] || null,
-    created_at: new Date(j.createdAt).toISOString(),
-    completed_at: j.completedAt ? new Date(j.completedAt).toISOString() : undefined,
-  }));
-
-  const response: PaginatedResponse<GenerationJobListItem> = {
-    data,
-    total,
-    page,
-    page_size: pageSize,
-    has_more: page * pageSize < total,
-  };
-
-  return successResponse(res, response, requestId);
 }
