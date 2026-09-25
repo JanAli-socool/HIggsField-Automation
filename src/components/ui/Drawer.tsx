@@ -40,7 +40,7 @@ export function Drawer({
   children,
   title,
   side = "right",
-  size = "md",
+  size: _size = "md",
   className,
 }: DrawerProps) {
   return (

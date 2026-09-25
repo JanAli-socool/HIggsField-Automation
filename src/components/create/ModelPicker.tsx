@@ -2,9 +2,9 @@ import { models, capabilityLabels, capabilityColors } from "../../data/models";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { Drawer } from "../ui/Drawer";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
-import { X, Check, ExternalLink } from "lucide-react";
+import { X, Check } from "lucide-react";
 
 interface ModelPickerProps {
   selectedModelId: string;

@@ -17,17 +17,17 @@ export function TemplateMode() {
     assets,
     setAsset,
     modelId,
-    setModelId,
+    setModelId: _setModelId,
     resolution,
     setResolution,
     aspectRatio,
     setAspectRatio,
     quality,
     setQuality,
-    steps,
-    setSteps,
-    guidanceScale,
-    setGuidanceScale,
+    steps: _steps,
+    setSteps: _setSteps,
+    guidanceScale: _guidanceScale,
+    setGuidanceScale: _setGuidanceScale,
     seed,
     setSeed,
     durationSeconds,
@@ -47,6 +47,7 @@ export function TemplateMode() {
 
   const [activeCategory, setActiveCategory] = useState<typeof categories[0]["id"]>("all");
   const [selectedEffect, setSelectedEffect] = useState<typeof effects[0] | null>(null);
+  const _selectedEffect = selectedEffect;
 
   const filteredEffects = activeCategory === "all"
     ? effects

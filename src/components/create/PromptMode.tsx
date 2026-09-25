@@ -1,20 +1,18 @@
 import { models } from "../../data/models";
-import { ModelPicker } from "./ModelPicker";
 import { PromptEditor } from "./PromptEditor";
 import { AssetUploader } from "./AssetUploader";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
 import { useCreateStore } from "../../stores/useCreateStore";
 import { motion } from "framer-motion";
-import { Sparkles, Zap, Settings, ChevronDown, Image as ImageIcon, Video as VideoIcon, Loader2, Zap as ZapIcon, Brain, ArrowRight, CheckCircle, AlertTriangle } from "lucide-react";
-import { cn } from "../../lib/utils";
+import { Sparkles, Settings, ChevronDown, Image as ImageIcon, Video as VideoIcon, Loader2, Zap as ZapIcon, Brain, ArrowRight } from "lucide-react";
 
 export function PromptMode() {
   const {
     prompt,
     setPrompt,
     modelId,
-    setModelId,
+    setModelId: _setModelId,
     assets,
     setAsset,
     resolution,
@@ -23,10 +21,10 @@ export function PromptMode() {
     setAspectRatio,
     quality,
     setQuality,
-    steps,
-    setSteps,
-    guidanceScale,
-    setGuidanceScale,
+    steps: _steps,
+    setSteps: _setSteps,
+    guidanceScale: _guidanceScale,
+    setGuidanceScale: _setGuidanceScale,
     seed,
     setSeed,
     durationSeconds,
@@ -45,13 +43,14 @@ export function PromptMode() {
     enhancedPrompt,
     workflowRecommendation,
     isEnhancing,
-    isDetectingWorkflow,
+    isDetectingWorkflow: _isDetectingWorkflow,
     enhancePrompt,
     applyEnhancedPrompt,
     clearEnhancement,
   } = useCreateStore();
 
   const selectedModel = models.find((m) => m.id === modelId) || models[0];
+  const _selectedModel = selectedModel;
 
   const hasEnhancedPrompt = enhancedPrompt && enhancedPrompt.enhanced_prompt !== prompt;
 

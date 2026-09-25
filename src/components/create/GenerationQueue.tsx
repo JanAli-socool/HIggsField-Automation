@@ -1,7 +1,7 @@
 import type { GenerationJob } from "../../types";
 import { Button } from "../ui/Button";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Loader2, CheckCircle, AlertCircle, Clock, Eye, Download, X as XIcon } from "lucide-react";
+import { X, Loader2, CheckCircle, AlertCircle, Clock, Eye, Download } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useState } from "react";
 import { VideoPlayer } from "../ui/VideoPlayer";
@@ -91,8 +91,9 @@ function ResultViewer({ job, onClose }: { job: GenerationJob; onClose: () => voi
 }
 
 export function GenerationQueue({ queue, onRemove }: { queue: GenerationJob[]; onRemove: (id: string) => void }) {
-  if (queue.length === 0) return null;
   const [viewJob, setViewJob] = useState<GenerationJob | null>(null);
+
+  if (queue.length === 0) return null;
 
   return (
     <>
