@@ -5,7 +5,7 @@ import type {
   GenerationParameters,
   JobStatus,
   FailureType,
-} from "../../types/api";
+} from "../../types/api.js";
 
 export interface ProviderConfig {
   apiKey: string;

@@ -1,4 +1,4 @@
-import { env } from "../env";
+import { env } from "../env.js";
 import type {
   GenerationRequest,
   GenerationJob,
@@ -6,8 +6,8 @@ import type {
   GenerationParameters,
   JobStatus,
   FailureType,
-} from "../../types/api";
-import { BaseProvider, GenerationProvider, ProviderConfig } from "./base";
+} from "../../types/api.js";
+import { BaseProvider, GenerationProvider, ProviderConfig } from "./base.js";
 
 interface FluxGenerateResponse {
   id: string;
