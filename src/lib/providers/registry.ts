@@ -1,4 +1,4 @@
-import { env } from "../env";
+import { env } from "../env.js";
 import type {
   GenerationRequest,
   GenerationJob,
@@ -6,15 +6,15 @@ import type {
   GenerationParameters,
   JobStatus,
   FailureType,
-} from "../../types/api";
-import { GenerationProvider, ProviderConfig } from "./base";
-import { MockProvider } from "./mock";
-import { FluxProvider } from "./flux";
-import { SDXLProvider } from "./sdxl";
-import { QwenImageProvider } from "./qwen";
-import { WanProvider } from "./wan";
-import { LTXProvider } from "./ltx";
-import { HunyuanProvider } from "./hunyuan";
+} from "../../types/api.js";
+import { GenerationProvider, ProviderConfig } from "./base.js";
+import { MockProvider } from "./mock.js";
+import { FluxProvider } from "./flux.js";
+import { SDXLProvider } from "./sdxl.js";
+import { QwenImageProvider } from "./qwen.js";
+import { WanProvider } from "./wan.js";
+import { LTXProvider } from "./ltx.js";
+import { HunyuanProvider } from "./hunyuan.js";
 
 type ModelName = GenerationParameters["model"];
 

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import prisma from "../lib/db/client";
+import prisma from "../lib/db/client.js";
 
 interface RateLimitConfig {
   windowMs: number;

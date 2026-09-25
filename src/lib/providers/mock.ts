@@ -5,8 +5,8 @@ import type {
   GenerationParameters,
   JobStatus,
   FailureType,
-} from "../../types/api";
-import { BaseProvider, GenerationProvider, ProviderConfig } from "./base";
+} from "../../types/api.js";
+import { BaseProvider, GenerationProvider, ProviderConfig } from "./base.js";
 
 const MOCK_JOBS = new Map<string, GenerationJob>();
 const MOCK_DELAYS: Record<string, number> = {
