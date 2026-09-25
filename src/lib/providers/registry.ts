@@ -23,17 +23,37 @@ interface ProviderInstance {
   config: ProviderConfig;
 }
 
+function hasValidApiKey(): boolean {
+  return !!env.REPLICATE_API_TOKEN && env.REPLICATE_API_TOKEN !== "mock_key";
+}
+
 class ProviderRegistry {
   private providers: Map<ModelName, ProviderInstance> = new Map();
   private defaultProvider: GenerationProvider;
+  private useMock: boolean;
 
   constructor() {
+    this.useMock = !hasValidApiKey();
     this.defaultProvider = new MockProvider({ apiKey: "mock_key" });
     this.initializeDefaultProviders();
   }
 
   private initializeDefaultProviders(): void {
-    const apiKey = env.REPLICATE_API_TOKEN || "mock_key";
+    if (this.useMock) {
+      console.log("[ProviderRegistry] No valid REPLICATE_API_TOKEN, using MockProvider for all models");
+      // Register mock provider for all supported models
+      const mockProvider = new MockProvider({ apiKey: "mock_key" });
+      const allModels: ModelName[] = [
+        "flux_schnell", "sdxl", "qwen_image",
+        "wan21", "ltx", "hunyuan"
+      ];
+      for (const model of allModels) {
+        this.register(model, mockProvider);
+      }
+      return;
+    }
+
+    const apiKey = env.REPLICATE_API_TOKEN;
     const baseUrl = env.REPLICATE_API_BASE;
 
     const config: ProviderConfig = {
@@ -114,6 +134,11 @@ export async function retryGeneration(jobId: string): Promise<GenerationJob> {
 }
 
 function getProviderFromJobId(jobId: string): GenerationProvider {
+  // If using mock mode or jobId is a UUID (not provider-prefixed), use mock
+  if (providerRegistry.getProvider("flux_schnell") instanceof MockProvider) {
+    return providerRegistry.getProvider("flux_schnell");
+  }
+  
   if (jobId.startsWith("flux_")) return providerRegistry.getProvider("flux_schnell");
   if (jobId.startsWith("sdxl_")) return providerRegistry.getProvider("sdxl");
   if (jobId.startsWith("qwen_")) return providerRegistry.getProvider("qwen_image");
@@ -121,6 +146,8 @@ function getProviderFromJobId(jobId: string): GenerationProvider {
   if (jobId.startsWith("ltx_")) return providerRegistry.getProvider("ltx");
   if (jobId.startsWith("hunyuan_")) return providerRegistry.getProvider("hunyuan");
   if (jobId.startsWith("mock_")) return providerRegistry.getProvider("flux_schnell");
+  
+  // UUID-based job IDs (from mock mode) - use mock provider
   return providerRegistry.getProvider("flux_schnell");
 }
 

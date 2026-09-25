@@ -88,6 +88,8 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
     return errorResponse(res, "VALIDATION_FAILED", validation.errors.join(", "), 400, requestId);
   }
 
+  console.log(`[${requestId}] Validation passed for model: ${validation.selected_model}`);
+
   const moderation = await moderateContent(
     validation.resolved_parameters.prompt,
     validation.resolved_parameters.input_image_url,
@@ -140,6 +142,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
   }
 
   submitGeneration(body).catch(async (error) => {
+    console.error(`[${requestId}] Generation submission failed:`, error);
     const failedJob = { ...jobData, status: "failed", errorMessage: error.message, failureType: "provider_error", updatedAt: new Date() };
     if (isDatabaseAvailable()) {
       try {
