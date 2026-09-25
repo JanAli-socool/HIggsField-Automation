@@ -399,7 +399,7 @@ const storeCreator = (set: any, get: any) => ({
 
   detectWorkflow: async () => {
     const state = get();
-    if (!state.prompt.trim()) {
+    if (!state.prompt.trim() || state.prompt.trim().length < 3) {
       set({ workflowRecommendation: null });
       return;
     }

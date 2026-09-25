@@ -7,17 +7,27 @@ import { v4 as uuidv4 } from "uuid";
 async function moderateContent(prompt: string, inputImageUrl?: string, videoUrl?: string): Promise<{ flagged: boolean; reason?: string }> {
   const moderationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/moderation`;
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    
     const response = await fetch(moderationUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, image_url: inputImageUrl, video_url: videoUrl }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
+    
     if (response.ok) {
       const result = await response.json();
       return { flagged: result.data?.flagged || false, reason: result.data?.reason };
     }
   } catch (error) {
-    console.error("Moderation check failed:", error);
+    if (error instanceof Error && error.name === "AbortError") {
+      console.warn("Moderation check timed out, skipping");
+    } else {
+      console.error("Moderation check failed:", error);
+    }
   }
   return { flagged: false };
 }
