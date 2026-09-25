@@ -1,10 +1,22 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { ApiResponse, ApiError } from "../../../src/types/api.js";
-import { getGenerationStatus, cancelGeneration, retryGeneration, submitGeneration } from "../../../src/lib/providers/registry.js";
 import prisma from "../../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
 
 const mockGenerations = new Map<string, any>();
+
+const PLACEHOLDER_VIDEOS = [
+  "https://assets.mixkit.co/videos/preview/mixkit-clouds-moving-in-the-sky-time-lapse-1189-large.mp4",
+  "https://assets.mixkit.co/videos/preview/mixkit-waves-in-the-ocean-1190-large.mp4",
+  "https://assets.mixkit.co/videos/preview/mixkit-forest-sunrise-1191-large.mp4",
+];
+
+function getPlaceholderUrl(mediaType: string, index: number = 0): string {
+  if (mediaType.startsWith("image")) {
+    return `https://picsum.photos/seed/mock${index + 1}/1024/1024`;
+  }
+  return PLACEHOLDER_VIDEOS[index % PLACEHOLDER_VIDEOS.length];
+}
 
 function isDatabaseAvailable(): boolean {
   return !!process.env.DATABASE_URL;
@@ -25,6 +37,55 @@ function errorResponse(res: VercelResponse, code: string, message: string, statu
 
 function successResponse<T>(res: VercelResponse, data: T, requestId: string, status = 200) {
   return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
+}
+
+// Local mock functions
+async function getGenerationStatusMock(jobId: string): Promise<{ status: string; progress: number; resultUrls?: string[]; error?: string; failureType?: string }> {
+  const job = mockGenerations.get(jobId);
+  if (!job) {
+    return { status: "failed", progress: 0, error: "Job not found", failureType: "generation_failed" };
+  }
+  return {
+    status: job.status,
+    progress: job.progress,
+    resultUrls: job.resultUrls || job.outputAssetUrls || job.result_urls,
+    error: job.errorMessage,
+    failureType: job.failureType,
+  };
+}
+
+async function cancelGenerationMock(jobId: string): Promise<void> {
+  const job = mockGenerations.get(jobId);
+  if (job && (job.status === "queued" || job.status === "generating")) {
+    mockGenerations.set(jobId, { ...job, status: "cancelled", updatedAt: new Date() });
+  }
+}
+
+async function submitGenerationMock(params: any): Promise<{ id: string; status: string; progress: number; resultUrls: string[] }> {
+  const jobId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  const now = new Date().toISOString();
+  
+  const resultUrls: string[] = [];
+  const thumbnailUrls: string[] = [];
+  const mediaType = params.media_type || "text_to_video";
+  const numOutputs = params.num_outputs || 1;
+  
+  for (let i = 0; i < numOutputs; i++) {
+    if (mediaType.startsWith("image")) {
+      resultUrls.push(`https://picsum.photos/seed/mock${i + 1}/1024/1024`);
+      thumbnailUrls.push(`https://picsum.photos/seed/mock${i + 1}/1024/1024`);
+    } else {
+      resultUrls.push(PLACEHOLDER_VIDEOS[i % PLACEHOLDER_VIDEOS.length]);
+      thumbnailUrls.push(PLACEHOLDER_VIDEOS[i % PLACEHOLDER_VIDEOS.length]);
+    }
+  }
+
+  return {
+    id: jobId,
+    status: "completed",
+    progress: 100,
+    resultUrls,
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -76,12 +137,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error) {
     console.error("Job handler error:", error);
-    return errorResponse(res, "INTERNAL_ERROR", "Internal server error", 500, requestId);
+    return errorResponse(res, "INTERNAL_ERROR", error instanceof Error ? error.message : "Internal server error", 500, requestId);
   }
 }
 
 async function handleGet(req: VercelRequest, job: any, requestId: string) {
-  const providerStatus = await getGenerationStatus(job.id);
+  const providerStatus = await getGenerationStatusMock(job.id);
 
   return successResponse(res, {
     id: job.id,
@@ -90,10 +151,10 @@ async function handleGet(req: VercelRequest, job: any, requestId: string) {
     status: providerStatus.status,
     progress: providerStatus.progress,
     request: job.parameters,
-    resultUrls: providerStatus.resultUrls || job.outputAssetUrls,
-    thumbnailUrls: job.thumbnailUrls,
+    resultUrls: providerStatus.resultUrls || job.outputAssetUrls || job.result_urls,
+    thumbnailUrls: job.thumbnailUrls || job.thumbnail_urls,
     errorMessage: providerStatus.error || job.errorMessage,
-    failureType: providerStatus.failureType || job.failureType,
+    failureType: providerStatus.failureType || job.failure_type,
     providerJobId: job.providerJobId,
     creditCost: job.creditCost,
     createdAt: new Date(job.createdAt).toISOString(),
@@ -117,7 +178,7 @@ async function handleCancel(req: VercelRequest, job: any, requestId: string) {
     mockGenerations.set(job.id, cancelledJob);
   }
 
-  await cancelGeneration(job.id);
+  await cancelGenerationMock(job.id);
 
   return successResponse(res, { id: job.id, status: "cancelled" }, requestId);
 }
@@ -159,8 +220,8 @@ async function handleRetry(req: VercelRequest, job: any, requestId: string) {
     mockGenerations.set(newJobId, newJob);
   }
 
-  await submitGeneration(job.parameters as any).catch(async (error) => {
-    const failedJob = { ...newJob, status: "failed", errorMessage: error.message, failureType: "provider_error", updatedAt: new Date() };
+  const completedJob = await submitGenerationMock(job.parameters as any).catch(async (error) => {
+    const failedJob = { ...newJob, status: "failed", errorMessage: error instanceof Error ? error.message : "Generation failed", failureType: "provider_error", updatedAt: new Date() };
     if (isDatabaseAvailable()) {
       try {
         await prisma.generation.update({ where: { id: newJobId }, data: failedJob });
@@ -168,11 +229,39 @@ async function handleRetry(req: VercelRequest, job: any, requestId: string) {
     } else {
       mockGenerations.set(newJobId, failedJob);
     }
+    throw error;
   });
+
+  // Update with completed job data
+  const updatedJob = { ...newJob, ...completedJob, status: "completed", progress: 100 };
+  if (isDatabaseAvailable()) {
+    try {
+      await prisma.generation.update({ where: { id: newJobId }, data: updatedJob });
+    } catch { mockGenerations.set(newJobId, updatedJob); }
+  } else {
+    mockGenerations.set(newJobId, updatedJob);
+  }
 
   return successResponse(res, {
     id: newJob.id,
     status: newJob.status,
     progress: newJob.progress,
   }, requestId);
+}
+
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function getUserId(req: VercelRequest): string {
+  return req.headers["x-user-id"] as string || "mock_user";
+}
+
+function errorResponse(res: VercelResponse, code: string, message: string, status: number, requestId: string) {
+  const error: ApiError = { code, message, request_id: requestId };
+  return res.status(status).json({ error, request_id: requestId } as ApiResponse<never>);
+}
+
+function successResponse<T>(res: VercelResponse, data: T, requestId: string, status = 200) {
+  return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
 }
