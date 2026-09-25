@@ -1,10 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GenerationRequest, GenerationJob, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "../../../src/types/api";
-import { validateGeneration, submitGeneration } from "../../../src/lib/providers/registry";
-import prisma from "../../../src/lib/db/client";
+import { GenerationRequest, GenerationJob, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "../../../src/types/api.js";
+import { validateGeneration, submitGeneration } from "../../../src/lib/providers/registry.js";
+import prisma from "../../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
 
-// In-memory mock database for when Prisma is not available
 const mockGenerations = new Map<string, any>();
 
 function isDatabaseAvailable(): boolean {

@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { Project, ApiResponse, ApiError, PaginatedResponse } from "../../../src/types/api";
-import prisma from "../../../src/lib/db/client";
+import { Project, ApiResponse, ApiError, PaginatedResponse } from "../../../src/types/api.js";
+import prisma from "../../../src/lib/db/client.js";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../../src/lib/auth/config";
+import { authOptions } from "../../../src/lib/auth/config.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;

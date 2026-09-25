@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { EnhancePromptRequest, EnhancePromptResponse, ApiResponse, ApiError } from "../../../src/types/api";
+import { EnhancePromptRequest, EnhancePromptResponse, ApiResponse, ApiError } from "../../../src/types/api.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -44,9 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return errorResponse(res, "MISSING_MEDIA_TYPE", "Media type is required", 400, requestId);
     }
 
-    // In production, call Nemotron API here
-    // For now, simulate enhancement with templates
-    const baseEnhancement = ENHANCEMENT_PROMPTS[body.media_type] || ENHANCEMENT_PROMPTS.image;
     const enhanced = await simulateNemotronEnhancement(body.prompt, body.media_type, body.style);
 
     const response: EnhancePromptResponse = {
@@ -67,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 async function simulateNemotronEnhancement(
   prompt: string,
   mediaType: string,
-  style?: string
+  _style?: string
 ): Promise<{
   enhanced_prompt: string;
   negative_prompt: string;
@@ -75,7 +72,6 @@ async function simulateNemotronEnhancement(
   parameters: Record<string, any>;
   reasoning: string;
 }> {
-  // Simulate API delay
   await new Promise((resolve) => setTimeout(resolve, 500));
 
   const modelMap: Record<string, string> = {

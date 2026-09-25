@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ApiResponse, ApiError } from "../../../src/types/api";
+import { ApiResponse, ApiError } from "../../../src/types/api.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -15,27 +15,16 @@ function successResponse<T>(res: VercelResponse, data: T, requestId: string, sta
 }
 
 const BLOCKED_TERMS = [
-  "child sexual abuse",
-  "csam",
-  "minor",
-  "underage",
-  "rape",
-  "sexual violence",
-  "extreme violence",
-  "terrorism",
-  "terrorist",
-  "self-harm",
-  "suicide",
-  "eating disorder",
-  "anorexia",
-  "bulimia",
+  "child sexual abuse", "csam", "minor", "underage", "rape", "sexual violence",
+  "extreme violence", "terrorism", "terrorist", "self-harm", "suicide",
+  "eating disorder", "anorexia", "bulimia",
 ];
 
 const SUSPICIOUS_PATTERNS = [
-    /\b(nude|naked|sex|porn|xxx|adult|erotic)\b/i,
-    /\b(hate|racist|nazi|supremacist)\b/i,
-    /\b(weapon|bomb|explosive|gun|knife)\b/i,
-    /\b(drug|cocaine|heroin|methamphetamine)\b/i,
+  /\b(nude|naked|sex|porn|xxx|adult|erotic)\b/i,
+  /\b(hate|racist|nazi|supremacist)\b/i,
+  /\b(weapon|bomb|explosive|gun|knife)\b/i,
+  /\b(drug|cocaine|heroin|methamphetamine)\b/i,
 ];
 
 interface ModerationResult {

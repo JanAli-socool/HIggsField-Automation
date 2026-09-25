@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { WorkflowSelectRequest, WorkflowSelectResponse, ApiResponse, ApiError } from "../../../src/types/api";
+import { WorkflowSelectRequest, WorkflowSelectResponse, ApiResponse, ApiError } from "../../../src/types/api.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -46,12 +46,10 @@ function selectWorkflow(
 ): WorkflowSelectResponse {
   const lowerPrompt = prompt.toLowerCase();
 
-  // If user explicitly specifies media type, trust it (with validation)
   if (mediaTypeHint) {
     return validateAndReturnWorkflow(mediaTypeHint, inputImageUrl, maskUrl, prompt);
   }
 
-  // Detect from prompt keywords
   const videoKeywords = [
     "video", "animation", "moving", "motion", "film", "cinematic", "footage",
     "timelapse", "slow motion", "camera move", "pan", "zoom", "tracking shot"
@@ -77,7 +75,6 @@ function selectWorkflow(
 
   if (isVideo) {
     if (inputImageUrl && maskUrl) {
-      // Not typical for video, but could be first+last frame
       workflow = "first_and_last_frame_to_video";
       recommendedModel = "wan21";
       requiredInputs = ["first_frame_image_url", "last_frame_image_url"];
@@ -102,17 +99,15 @@ function selectWorkflow(
     recommendedModel = "flux_schnell";
   }
 
-  // Validate required inputs
   const missingInputs = requiredInputs.filter(input => {
     if (input === "input_image_url") return !inputImageUrl;
     if (input === "mask_url") return !maskUrl;
     if (input === "first_frame_image_url") return !inputImageUrl;
-    if (input === "last_frame_image_url") return false; // Would need separate param
+    if (input === "last_frame_image_url") return true;
     return false;
   });
 
   if (missingInputs.length > 0) {
-    // Fall back to simpler workflow
     if (workflow === "image_to_video") {
       workflow = "text_to_video";
       recommendedModel = "wan21";
@@ -141,7 +136,7 @@ function validateAndReturnWorkflow(
   mediaType: string,
   inputImageUrl?: string,
   maskUrl?: string,
-  prompt?: string
+  _prompt?: string
 ): WorkflowSelectResponse {
   const workflowMap: Record<string, { workflow: string; model: string; inputs: string[] }> = {
     image: { workflow: "image", model: "flux_schnell", inputs: [] },
@@ -169,7 +164,7 @@ function validateAndReturnWorkflow(
     if (input === "input_image_url") return !inputImageUrl;
     if (input === "mask_url") return !maskUrl;
     if (input === "first_frame_image_url") return !inputImageUrl;
-    if (input === "last_frame_image_url") return true; // Would need separate check
+    if (input === "last_frame_image_url") return true;
     return false;
   });
 

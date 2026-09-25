@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ApiResponse, ApiError } from "../../../src/types/api";
-import prisma from "../../../src/lib/db/client";
+import { ApiResponse, ApiError } from "../../../src/types/api.js";
+import prisma from "../../../src/lib/db/client.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -24,7 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { id, status, output, error, logs } = req.body as any;
+    const { id, status, output, error, logs: _logs } = req.body as any;
 
     if (!id) {
       return errorResponse(res, "MISSING_ID", "Missing prediction ID", 400, requestId);

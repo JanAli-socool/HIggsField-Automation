@@ -1,12 +1,27 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ApiResponse } from "../../../src/types/api";
-import prisma from "../../../src/lib/db/client";
+import { ApiResponse, ApiError } from "../../../src/types/api.js";
+
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function errorResponse(res: VercelResponse, code: string, message: string, status: number, requestId: string) {
+  const error: ApiError = { code, message, request_id: requestId };
+  return res.status(status).json({ error, request_id: requestId } as ApiResponse<never>);
+}
+
+function successResponse<T>(res: VercelResponse, data: T, requestId: string, status = 200) {
+  return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const start = Date.now();
 
   try {
+    const { PrismaClient } = await import("@prisma/client");
+    const prisma = new PrismaClient();
     await prisma.$queryRaw`SELECT 1`;
+    await prisma.$disconnect();
     const dbLatency = Date.now() - start;
 
     return res.status(200).json({
