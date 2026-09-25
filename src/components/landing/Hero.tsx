@@ -13,7 +13,8 @@ const stats = [
   { value: "1M+", label: "Films Created" },
 ];
 
-// Hero background placeholder - using a simple SVG data URL
+// Hero background - using external video URL
+const heroVideoUrl = "https://assets.mixkit.co/videos/preview/mixkit-clouds-moving-in-the-sky-time-lapse-1189-large.mp4";
 const heroPlaceholder = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxOTIwIDEwODAiIGZpbGw9Im5vbmUiPgogPHJlY3Qgd2lkdGg9IjE5MjAiIGhlaWdodD0iMTA4MCIgZmlsbD0iIzBBMEFGRiIvPgogPHJlY3QgeD0iMjAwIiB5PSIyMDAiIHdpZHRoPSIxNTIwIiBoZWlnaHQ9IjY4MCIgcng9IjI0IiBmaWxsPSIjMTQxNDFFIiBvcGFjaXR5PSIwLjMiLz4KIDxjaXJjbGUgY3g9Ijk2MCIgY3k9IjU0MCIgcj0iMTIwIiBmaWxsPSIjQTg1NUY3IiBvcGFjaXR5PSIwLjA4Ii8+CiA8Y2lyY2xlIGN4PSI5NjAiIGN5PSI1NDAiIHI9IjgwIiBmaWxsPSIjMDZCNkQ0IiBvcGFjaXR5PSIwLjA2Ii8+CiA8Y2lyY2xlIGN4PSI5NjAiIGN5PSI1NDAiIHI9IjQwIiBmaWxsPSIjQTg1NUY3IiBvcGFjaXR5PSIwLjEyIi8+CiA8cGF0aCBkPSJNNzk2IDU0MEwxMTAwIDQ1ME05NjAgNTQwTDgyMCA2MzAiIHN0cm9rZT0iI0E4NTVGNyIgc3Ryb2tlLXdpZHRoPSIxIiBzdHJva2UtbGluZWNhcD0icm91bmQiIG9wYWNpdHk9IjAuMyIvPgogPHBhdGggZD0iTTk2MCA1NDBMMTEwMCA2MzBNOTYwIDU0MCA4MjAgNDUwIiBzdHJva2U9IiMwNkI2RDQiIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBvcGFjaXR5PSIwLjMiLz4KPC9zdmc+";
 
 export function Hero() {
@@ -21,7 +22,7 @@ export function Hero() {
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16 lg:pt-20">
       <div className="absolute inset-0 z-0">
         <VideoPlayer
-          src="/videos/hero-bg.webm"
+          src={heroVideoUrl}
           poster={heroPlaceholder}
           fallback={heroPlaceholder}
           className="w-full h-full object-cover opacity-30"

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, ExternalLink } from "lucide-react";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import { models, capabilityLabels, capabilityColors } from "../../data/models";
 import { Badge } from "../ui/Badge";
 import { Container } from "../common/Container";
@@ -7,6 +7,19 @@ import { Button } from "../ui/Button";
 import { VideoPlayer } from "../ui/VideoPlayer";
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
+
+const VIDEO_PLACEHOLDERS = [
+  "https://assets.mixkit.co/videos/preview/mixkit-clouds-moving-in-the-sky-time-lapse-1189-large.mp4",
+  "https://assets.mixkit.co/videos/preview/mixkit-waves-in-the-ocean-1190-large.mp4",
+  "https://assets.mixkit.co/videos/preview/mixkit-forest-sunrise-1191-large.mp4",
+  "https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-city-at-night-1200-large.mp4",
+  "https://assets.mixkit.co/videos/preview/mixkit-sunset-over-mountain-landscape-1201-large.mp4",
+];
+
+function getModelVideoUrl(modelId: string): string {
+  const index = Math.abs(modelId.split("").reduce((a, b) => a + b.charCodeAt(0), 0)) % VIDEO_PLACEHOLDERS.length;
+  return VIDEO_PLACEHOLDERS[index];
+}
 
 export function ModelShowcase() {
   return (
@@ -51,8 +64,8 @@ export function ModelShowcase() {
                 >
                   <div className="relative aspect-[16/10] overflow-hidden">
                     <VideoPlayer
-                      src={`/videos/models/${model.id}.webm`}
-                      poster={`/videos/models/${model.id}-poster.jpg`}
+                      src={getModelVideoUrl(model.id)}
+                      poster={model.thumbnailUrl}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       autoPlay
                       loop
