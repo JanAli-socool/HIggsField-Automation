@@ -11,6 +11,11 @@ function isDatabaseAvailable(): boolean {
 }
 
 async function moderateContent(prompt: string, inputImageUrl?: string, videoUrl?: string): Promise<{ flagged: boolean; reason?: string }> {
+  // Skip moderation in serverless to avoid circular calls and timeouts
+  if (process.env.VERCEL) {
+    return { flagged: false };
+  }
+  
   const moderationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/moderation`;
   try {
     const controller = new AbortController();
@@ -75,84 +80,94 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: string) {
-  const userId = getUserId(req);
-  const body = req.body as GenerationRequest;
+  try {
+    const userId = getUserId(req);
+    const body = req.body as GenerationRequest;
 
-  if (!body?.parameters) {
-    return errorResponse(res, "INVALID_REQUEST", "Missing generation parameters", 400, requestId);
-  }
-
-  const validation = await validateGeneration(body);
-  if (!validation.valid) {
-    return errorResponse(res, "VALIDATION_FAILED", validation.errors.join(", "), 400, requestId);
-  }
-
-  console.log(`[${requestId}] Validation passed for model: ${validation.selected_model}`);
-
-  const moderation = await moderateContent(
-    validation.resolved_parameters.prompt,
-    validation.resolved_parameters.input_image_url,
-    undefined
-  );
-  if (moderation.flagged) {
-    return errorResponse(res, "CONTENT_REJECTED", moderation.reason || "Content violates policy", 400, requestId);
-  }
-
-  const userCredits = 1000;
-  if (userCredits < validation.estimated_credits) {
-    return errorResponse(res, "INSUFFICIENT_CREDITS", `Need ${validation.estimated_credits} credits, have ${userCredits}`, 402, requestId);
-  }
-
-  const jobId = uuidv4();
-  const now = new Date().toISOString();
-
-  const jobData = {
-    id: jobId,
-    userId,
-    projectId: body.project_id || null,
-    mediaType: validation.resolved_parameters.media_type,
-    model: validation.selected_model,
-    originalPrompt: validation.resolved_parameters.prompt,
-    enhancedPrompt: validation.resolved_parameters.prompt,
-    negativePrompt: validation.resolved_parameters.negative_prompt,
-    status: "queued",
-    progress: 0,
-    inputAssetUrl: validation.resolved_parameters.input_image_url,
-    maskUrl: validation.resolved_parameters.mask_url,
-    firstFrameImageUrl: validation.resolved_parameters.first_frame_image_url,
-    lastFrameImageUrl: validation.resolved_parameters.last_frame_image_url,
-    outputAssetUrls: [],
-    thumbnailUrls: [],
-    parameters: validation.resolved_parameters as any,
-    creditCost: validation.estimated_credits,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  if (isDatabaseAvailable()) {
-    try {
-      await prisma.generation.create({ data: jobData });
-    } catch (dbError) {
-      console.error("Database create failed, using mock:", dbError);
-      mockGenerations.set(jobId, jobData);
+    if (!body?.parameters) {
+      return errorResponse(res, "INVALID_REQUEST", "Missing generation parameters", 400, requestId);
     }
-  } else {
-    mockGenerations.set(jobId, jobData);
-  }
 
-  submitGeneration(body).catch(async (error) => {
-    console.error(`[${requestId}] Generation submission failed:`, error);
-    const failedJob = { ...jobData, status: "failed", errorMessage: error.message, failureType: "provider_error", updatedAt: new Date() };
+    // Sanitize prompt - remove trailing quotes/newlines
+    if (body.parameters.prompt) {
+      body.parameters.prompt = body.parameters.prompt.trim().replace(/^['"]|['"]$/g, '');
+    }
+
+    const validation = await validateGeneration(body);
+    if (!validation.valid) {
+      return errorResponse(res, "VALIDATION_FAILED", validation.errors.join(", "), 400, requestId);
+    }
+
+    console.log(`[${requestId}] Validation passed for model: ${validation.selected_model}`);
+
+    const moderation = await moderateContent(
+      validation.resolved_parameters.prompt,
+      validation.resolved_parameters.input_image_url,
+      undefined
+    );
+    if (moderation.flagged) {
+      return errorResponse(res, "CONTENT_REJECTED", moderation.reason || "Content violates policy", 400, requestId);
+    }
+
+    const userCredits = 1000;
+    if (userCredits < validation.estimated_credits) {
+      return errorResponse(res, "INSUFFICIENT_CREDITS", `Need ${validation.estimated_credits} credits, have ${userCredits}`, 402, requestId);
+    }
+
+    const jobId = uuidv4();
+    const now = new Date().toISOString();
+
+    const jobData = {
+      id: jobId,
+      userId,
+      projectId: body.project_id || null,
+      mediaType: validation.resolved_parameters.media_type,
+      model: validation.selected_model,
+      originalPrompt: validation.resolved_parameters.prompt,
+      enhancedPrompt: validation.resolved_parameters.prompt,
+      negativePrompt: validation.resolved_parameters.negative_prompt,
+      status: "queued",
+      progress: 0,
+      inputAssetUrl: validation.resolved_parameters.input_image_url,
+      maskUrl: validation.resolved_parameters.mask_url,
+      firstFrameImageUrl: validation.resolved_parameters.first_frame_image_url,
+      lastFrameImageUrl: validation.resolved_parameters.last_frame_image_url,
+      outputAssetUrls: [],
+      thumbnailUrls: [],
+      parameters: validation.resolved_parameters as any,
+      creditCost: validation.estimated_credits,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
     if (isDatabaseAvailable()) {
       try {
-        await prisma.generation.update({ where: { id: jobId }, data: failedJob });
-      } catch { mockGenerations.set(jobId, failedJob); }
+        await prisma.generation.create({ data: jobData });
+      } catch (dbError) {
+        console.error("Database create failed, using mock:", dbError);
+        mockGenerations.set(jobId, jobData);
+      }
     } else {
-      mockGenerations.set(jobId, failedJob);
+      mockGenerations.set(jobId, jobData);
     }
-  });
 
-  return successResponse(res, { id: jobId, status: "queued", progress: 0 }, requestId, 202);
+    submitGeneration(body).catch(async (error) => {
+      console.error(`[${requestId}] Generation submission failed:`, error);
+      const failedJob = { ...jobData, status: "failed", errorMessage: error.message, failureType: "provider_error", updatedAt: new Date() };
+      if (isDatabaseAvailable()) {
+        try {
+          await prisma.generation.update({ where: { id: jobId }, data: failedJob });
+        } catch { mockGenerations.set(jobId, failedJob); }
+      } else {
+        mockGenerations.set(jobId, failedJob);
+      }
+    });
+
+    return successResponse(res, { id: jobId, status: "queued", progress: 0 }, requestId, 202);
+  } catch (error) {
+    console.error(`[${requestId}] handleCreate error:`, error);
+    return errorResponse(res, "INTERNAL_ERROR", error instanceof Error ? error.message : "Generation failed", 500, requestId);
+  }
 }
 
 async function handleList(req: VercelRequest, res: VercelResponse, requestId: string) {
