@@ -62,7 +62,14 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
     },
   });
 
-  return successResponse(res, project, requestId, 201);
+  return successResponse(res, {
+    id: project.id,
+    user_id: project.userId,
+    name: project.name,
+    description: project.description ?? undefined,
+    created_at: project.createdAt.toISOString(),
+    updated_at: project.updatedAt.toISOString(),
+  }, requestId, 201);
 }
 
 async function handleList(req: VercelRequest, res: VercelResponse, requestId: string, userId: string) {
@@ -83,11 +90,11 @@ async function handleList(req: VercelRequest, res: VercelResponse, requestId: st
 
   const transformedProjects: Project[] = projects.map(p => ({
     id: p.id,
-    userId: p.userId,
+    user_id: p.userId,
     name: p.name,
     description: p.description ?? undefined,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
+    created_at: p.createdAt.toISOString(),
+    updated_at: p.updatedAt.toISOString(),
   }));
 
   const response: PaginatedResponse<Project> = {

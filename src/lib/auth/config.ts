@@ -1,5 +1,5 @@
 import { NextAuthOptions } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import prisma from "../db/client.js";
@@ -40,7 +40,7 @@ export const authOptions: NextAuthOptions = {
     error: "/auth/error",
   },
   providers: [
-    Credentials({
+    CredentialsProvider({
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
