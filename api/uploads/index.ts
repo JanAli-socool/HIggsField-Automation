@@ -63,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const fileName = `uploads/${uploadId}.${ext}`;
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    const result = await storage.upload(fileName, file.buffer, {
+    const result = await storage.upload(fileName, Buffer.from(file.buffer), {
       contentType: file.type,
       access: "public",
     });
