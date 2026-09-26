@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { WorkflowSelectRequest, WorkflowSelectResponse, ApiResponse, ApiError } from "../../../src/types/api.js";
+import { WorkflowSelectRequest, WorkflowSelectResponse, ApiResponse, ApiError } from "../../src/types/api.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ApiResponse, ApiError } from "../../../src/types/api.js";
-import prisma from "../../../src/lib/db/client.js";
+import { ApiResponse, ApiError } from "../../src/types/api.js";
+import prisma from "../../src/lib/db/client.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;

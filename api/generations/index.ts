@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GenerationRequest, GenerationJob, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "../../../src/types/api.js";
-import prisma from "../../../src/lib/db/client.js";
+import { GenerationRequest, GenerationJob, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "../../src/types/api.js";
+import prisma from "../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
 
 const mockGenerations = new Map<string, any>();
@@ -81,7 +81,6 @@ function validateGenerationLocal(body: GenerationRequest): { valid: boolean; err
   return {
     valid: errors.length === 0,
     errors,
-    warnings: [],
     estimated_credits: estimatedCredits,
     selected_model: parameters.model,
     resolved_parameters: parameters,

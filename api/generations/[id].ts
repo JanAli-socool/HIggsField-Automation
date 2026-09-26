@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ApiResponse, ApiError } from "../../../src/types/api.js";
-import prisma from "../../../src/lib/db/client.js";
+import { ApiResponse, ApiError } from "../../src/types/api.js";
+import prisma from "../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
 
 const mockGenerations = new Map<string, any>();
@@ -66,17 +66,14 @@ async function submitGenerationMock(params: any): Promise<{ id: string; status: 
   const now = new Date().toISOString();
   
   const resultUrls: string[] = [];
-  const thumbnailUrls: string[] = [];
   const mediaType = params.media_type || "text_to_video";
   const numOutputs = params.num_outputs || 1;
   
   for (let i = 0; i < numOutputs; i++) {
     if (mediaType.startsWith("image")) {
       resultUrls.push(`https://picsum.photos/seed/mock${i + 1}/1024/1024`);
-      thumbnailUrls.push(`https://picsum.photos/seed/mock${i + 1}/1024/1024`);
     } else {
       resultUrls.push(PLACEHOLDER_VIDEOS[i % PLACEHOLDER_VIDEOS.length]);
-      thumbnailUrls.push(PLACEHOLDER_VIDEOS[i % PLACEHOLDER_VIDEOS.length]);
     }
   }
 
@@ -122,14 +119,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     switch (req.method) {
       case "GET":
-        return await handleGet(req, job, requestId);
+        return await handleGet(req, res, job, requestId);
       case "POST":
         const action = req.query.action as string;
         if (action === "cancel") {
-          return await handleCancel(req, job, requestId);
+          return await handleCancel(req, res, job, requestId);
         }
         if (action === "retry") {
-          return await handleRetry(req, job, requestId);
+          return await handleRetry(req, res, job, requestId);
         }
         return errorResponse(res, "INVALID_ACTION", "Invalid action", 400, requestId);
       default:
@@ -141,7 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function handleGet(req: VercelRequest, job: any, requestId: string) {
+async function handleGet(req: VercelRequest, res: VercelResponse, job: any, requestId: string) {
   const providerStatus = await getGenerationStatusMock(job.id);
 
   return successResponse(res, {
@@ -163,7 +160,7 @@ async function handleGet(req: VercelRequest, job: any, requestId: string) {
   }, requestId);
 }
 
-async function handleCancel(req: VercelRequest, job: any, requestId: string) {
+async function handleCancel(req: VercelRequest, res: VercelResponse, job: any, requestId: string) {
   if (!["queued", "generating", "preparing_model", "validating_input"].includes(job.status)) {
     return errorResponse(res, "INVALID_STATE", `Cannot cancel job in ${job.status} state`, 400, requestId);
   }
@@ -183,7 +180,7 @@ async function handleCancel(req: VercelRequest, job: any, requestId: string) {
   return successResponse(res, { id: job.id, status: "cancelled" }, requestId);
 }
 
-async function handleRetry(req: VercelRequest, job: any, requestId: string) {
+async function handleRetry(req: VercelRequest, res: VercelResponse, job: any, requestId: string) {
   if (!["failed", "cancelled", "completed"].includes(job.status)) {
     return errorResponse(res, "INVALID_STATE", `Cannot retry job in ${job.status} state`, 400, requestId);
   }
@@ -247,21 +244,4 @@ async function handleRetry(req: VercelRequest, job: any, requestId: string) {
     status: newJob.status,
     progress: newJob.progress,
   }, requestId);
-}
-
-function generateRequestId(): string {
-  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function getUserId(req: VercelRequest): string {
-  return req.headers["x-user-id"] as string || "mock_user";
-}
-
-function errorResponse(res: VercelResponse, code: string, message: string, status: number, requestId: string) {
-  const error: ApiError = { code, message, request_id: requestId };
-  return res.status(status).json({ error, request_id: requestId } as ApiResponse<never>);
-}
-
-function successResponse<T>(res: VercelResponse, data: T, requestId: string, status = 200) {
-  return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
 }
