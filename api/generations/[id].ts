@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { ApiResponse, ApiError } from "../../src/types/api.js";
-import prisma from "../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
 
 const mockGenerations = new Map<string, any>();
@@ -16,10 +15,6 @@ function getPlaceholderUrl(mediaType: string, index: number = 0): string {
     return `https://picsum.photos/seed/mock${index + 1}/1024/1024`;
   }
   return PLACEHOLDER_VIDEOS[index % PLACEHOLDER_VIDEOS.length];
-}
-
-function isDatabaseAvailable(): boolean {
-  return !!process.env.DATABASE_URL;
 }
 
 function generateRequestId(): string {
@@ -39,7 +34,6 @@ function successResponse<T>(res: VercelResponse, data: T, requestId: string, sta
   return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
 }
 
-// Local mock functions
 async function getGenerationStatusMock(jobId: string): Promise<{ status: string; progress: number; resultUrls?: string[]; error?: string; failureType?: string }> {
   const job = mockGenerations.get(jobId);
   if (!job) {
@@ -96,18 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    let job: any;
-
-    if (isDatabaseAvailable()) {
-      try {
-        job = await prisma.generation.findUnique({ where: { id: jobId } });
-      } catch (dbError) {
-        console.error("Database query failed, using mock:", dbError);
-        job = mockGenerations.get(jobId);
-      }
-    } else {
-      job = mockGenerations.get(jobId);
-    }
+    const job = mockGenerations.get(jobId);
 
     if (!job) {
       return errorResponse(res, "NOT_FOUND", "Job not found", 404, requestId);
@@ -166,15 +149,7 @@ async function handleCancel(req: VercelRequest, res: VercelResponse, job: any, r
   }
 
   const cancelledJob = { ...job, status: "cancelled", updatedAt: new Date() };
-
-  if (isDatabaseAvailable()) {
-    try {
-      await prisma.generation.update({ where: { id: job.id }, data: cancelledJob });
-    } catch { mockGenerations.set(job.id, cancelledJob); }
-  } else {
-    mockGenerations.set(job.id, cancelledJob);
-  }
-
+  mockGenerations.set(job.id, cancelledJob);
   await cancelGenerationMock(job.id);
 
   return successResponse(res, { id: job.id, status: "cancelled" }, requestId);
@@ -209,39 +184,37 @@ async function handleRetry(req: VercelRequest, res: VercelResponse, job: any, re
     updatedAt: new Date(),
   };
 
-  if (isDatabaseAvailable()) {
-    try {
-      await prisma.generation.create({ data: newJob });
-    } catch { mockGenerations.set(newJobId, newJob); }
-  } else {
-    mockGenerations.set(newJobId, newJob);
-  }
+  mockGenerations.set(newJobId, newJob);
 
   const completedJob = await submitGenerationMock(job.parameters as any).catch(async (error) => {
     const failedJob = { ...newJob, status: "failed", errorMessage: error instanceof Error ? error.message : "Generation failed", failureType: "provider_error", updatedAt: new Date() };
-    if (isDatabaseAvailable()) {
-      try {
-        await prisma.generation.update({ where: { id: newJobId }, data: failedJob });
-      } catch { mockGenerations.set(newJobId, failedJob); }
-    } else {
-      mockGenerations.set(newJobId, failedJob);
-    }
+    mockGenerations.set(newJobId, failedJob);
     throw error;
   });
 
-  // Update with completed job data
   const updatedJob = { ...newJob, ...completedJob, status: "completed", progress: 100 };
-  if (isDatabaseAvailable()) {
-    try {
-      await prisma.generation.update({ where: { id: newJobId }, data: updatedJob });
-    } catch { mockGenerations.set(newJobId, updatedJob); }
-  } else {
-    mockGenerations.set(newJobId, updatedJob);
-  }
+  mockGenerations.set(newJobId, updatedJob);
 
   return successResponse(res, {
     id: newJob.id,
     status: newJob.status,
     progress: newJob.progress,
   }, requestId);
+}
+
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function getUserId(req: VercelRequest): string {
+  return req.headers["x-user-id"] as string || "mock_user";
+}
+
+function errorResponse(res: VercelResponse, code: string, message: string, status: number, requestId: string) {
+  const error: ApiError = { code, message, request_id: requestId };
+  return res.status(status).json({ error, request_id: requestId } as ApiResponse<never>);
+}
+
+function successResponse<T>(res: VercelResponse, data: T, requestId: string, status = 200) {
+  return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
 }

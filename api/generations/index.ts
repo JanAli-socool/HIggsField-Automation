@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { GenerationRequest, GenerationJob, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "../../src/types/api.js";
-import prisma from "../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
 
 const mockGenerations = new Map<string, any>();
@@ -16,10 +15,6 @@ function getPlaceholderUrl(mediaType: string, index: number = 0): string {
     return `https://picsum.photos/seed/mock${index + 1}/1024/1024`;
   }
   return PLACEHOLDER_VIDEOS[index % PLACEHOLDER_VIDEOS.length];
-}
-
-function isDatabaseAvailable(): boolean {
-  return !!process.env.DATABASE_URL;
 }
 
 function estimateCredits(params: any): number {
@@ -104,41 +99,6 @@ function successResponse<T>(res: VercelResponse, data: T, requestId: string, sta
   return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
 }
 
-// Simple mock submit that works without external dependencies
-async function submitGenerationMock(body: GenerationRequest): Promise<GenerationJob> {
-  const validation = validateGenerationLocal(body);
-  if (!validation.valid) {
-    throw new Error(`Validation failed: ${validation.errors.join(", ")}`);
-  }
-
-  const params = validation.resolved_parameters;
-  const jobId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-  const now = new Date().toISOString();
-
-  const resultUrls: string[] = [];
-  const thumbnailUrls: string[] = [];
-
-  for (let i = 0; i < params.num_outputs; i++) {
-    resultUrls.push(getPlaceholderUrl(params.media_type, i));
-    thumbnailUrls.push(getPlaceholderUrl(params.media_type, i));
-  }
-
-  return {
-    id: jobId,
-    user_id: "mock_user",
-    project_id: body.project_id || null,
-    status: "completed",
-    progress: 100,
-    request: body,
-    result_urls: resultUrls,
-    thumbnail_urls: thumbnailUrls,
-    credit_cost: validation.estimated_credits,
-    created_at: now,
-    updated_at: now,
-    completed_at: now,
-  };
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestId = generateRequestId();
   res.setHeader("X-Request-ID", requestId);
@@ -214,36 +174,51 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
     // Store in mock DB
     mockGenerations.set(jobId, jobData);
 
-    // Submit to mock provider (fire and forget)
-    submitGenerationMock(body).then(async (completedJob) => {
-      try {
-        const updatedJob = { ...jobData, ...completedJob, status: "completed", progress: 100 };
-        if (isDatabaseAvailable()) {
-          try {
-            await prisma.generation.update({ where: { id: jobId }, data: updatedJob });
-          } catch { mockGenerations.set(jobId, updatedJob); }
-        } else {
-          mockGenerations.set(jobId, updatedJob);
-        }
-      } catch (error) {
-        console.error(`[${requestId}] Generation completion failed:`, error);
-      }
-    }).catch(async (error) => {
-      console.error(`[${requestId}] Generation submission failed:`, error);
-      const failedJob = { ...jobData, status: "failed", errorMessage: error instanceof Error ? error.message : "Generation failed", failureType: "provider_error", updatedAt: new Date() };
-      if (isDatabaseAvailable()) {
-        try {
-          await prisma.generation.update({ where: { id: jobId }, data: failedJob });
-        } catch { mockGenerations.set(jobId, failedJob); }
-      } else {
-        mockGenerations.set(jobId, failedJob);
-      }
+    // Complete generation synchronously (fire and forget)
+    completeGenerationMock(jobId, validation).catch((error) => {
+      console.error(`[${requestId}] Generation completion failed:`, error);
     });
 
     return successResponse(res, { id: jobId, status: "queued", progress: 0 }, requestId, 202);
   } catch (error) {
     console.error(`[${requestId}] handleCreate error:`, error);
     return errorResponse(res, "INTERNAL_ERROR", error instanceof Error ? error.message : "Generation failed", 500, requestId);
+  }
+}
+
+async function completeGenerationMock(jobId: string, validation: any) {
+  try {
+    const params = validation.resolved_parameters;
+    const now = new Date().toISOString();
+
+    const resultUrls: string[] = [];
+    const thumbnailUrls: string[] = [];
+
+    for (let i = 0; i < params.num_outputs; i++) {
+      resultUrls.push(getPlaceholderUrl(params.media_type, i));
+      thumbnailUrls.push(getPlaceholderUrl(params.media_type, i));
+    }
+
+    const completedJob = {
+      id: jobId,
+      status: "completed",
+      progress: 100,
+      result_urls: resultUrls,
+      thumbnail_urls: thumbnailUrls,
+      completed_at: now,
+      updated_at: now,
+    };
+
+    const existing = mockGenerations.get(jobId);
+    if (existing) {
+      mockGenerations.set(jobId, { ...existing, ...completedJob });
+    }
+  } catch (error) {
+    console.error(`[${jobId}] Completion failed:`, error);
+    const existing = mockGenerations.get(jobId);
+    if (existing) {
+      mockGenerations.set(jobId, { ...existing, status: "failed", errorMessage: String(error), updated_at: new Date().toISOString() });
+    }
   }
 }
 
@@ -255,37 +230,8 @@ async function handleList(req: VercelRequest, res: VercelResponse, requestId: st
     const status = req.query.status as string | undefined;
     const mediaType = req.query.media_type as string | undefined;
 
-    let jobs: any[] = [];
-    let total = 0;
-
-    if (isDatabaseAvailable()) {
-      try {
-        const where: any = { userId };
-        if (status) where.status = status;
-        if (mediaType) where.mediaType = mediaType;
-
-        [jobs, total] = await Promise.all([
-          prisma.generation.findMany({
-            where,
-            orderBy: { createdAt: "desc" },
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-            select: {
-              id: true, status: true, progress: true, mediaType: true, model: true,
-              originalPrompt: true, thumbnailUrls: true, createdAt: true, completedAt: true,
-            },
-          }),
-          prisma.generation.count({ where }),
-        ]);
-      } catch (dbError) {
-        console.error("Database query failed, using mock:", dbError);
-        jobs = Array.from(mockGenerations.values()).filter(j => j.userId === userId);
-        total = jobs.length;
-      }
-    } else {
-      jobs = Array.from(mockGenerations.values()).filter(j => j.userId === userId);
-      total = jobs.length;
-    }
+    let jobs = Array.from(mockGenerations.values()).filter(j => j.userId === userId);
+    let total = jobs.length;
 
     if (status) jobs = jobs.filter(j => j.status === status);
     if (mediaType) jobs = jobs.filter(j => j.mediaType === mediaType);
