@@ -174,19 +174,23 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
     // Store in mock DB
     mockGenerations.set(jobId, jobData);
 
-    // Complete generation synchronously (fire and forget)
-    completeGenerationMock(jobId, validation).catch((error) => {
-      console.error(`[${requestId}] Generation completion failed:`, error);
-    });
+    // Complete generation synchronously (instant for mock)
+    const completedJob = await completeGenerationMock(jobId, validation);
 
-    return successResponse(res, { id: jobId, status: "queued", progress: 0 }, requestId, 202);
+    return successResponse(res, { 
+      id: jobId, 
+      status: "completed", 
+      progress: 100,
+      resultUrls: completedJob.result_urls,
+      thumbnailUrls: completedJob.thumbnail_urls
+    }, requestId, 200);
   } catch (error) {
     console.error(`[${requestId}] handleCreate error:`, error);
     return errorResponse(res, "INTERNAL_ERROR", error instanceof Error ? error.message : "Generation failed", 500, requestId);
   }
 }
 
-async function completeGenerationMock(jobId: string, validation: any) {
+async function completeGenerationMock(jobId: string, validation: any): Promise<{ result_urls: string[]; thumbnail_urls: string[] }> {
   try {
     const params = validation.resolved_parameters;
     const now = new Date().toISOString();
@@ -213,12 +217,15 @@ async function completeGenerationMock(jobId: string, validation: any) {
     if (existing) {
       mockGenerations.set(jobId, { ...existing, ...completedJob });
     }
+
+    return { result_urls: resultUrls, thumbnail_urls: thumbnailUrls };
   } catch (error) {
     console.error(`[${jobId}] Completion failed:`, error);
     const existing = mockGenerations.get(jobId);
     if (existing) {
       mockGenerations.set(jobId, { ...existing, status: "failed", errorMessage: String(error), updated_at: new Date().toISOString() });
     }
+    throw error;
   }
 }
 
