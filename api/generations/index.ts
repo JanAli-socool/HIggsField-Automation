@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { GenerationRequest, GenerationJob, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "../../src/types/api.js";
 import { validateGeneration, submitGeneration, getGenerationStatus } from "../../src/lib/providers/registry.js";
-import prisma from "../../../src/lib/db/client.js";
+import prisma from "../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
 
 const mockGenerations = new Map<string, any>();
