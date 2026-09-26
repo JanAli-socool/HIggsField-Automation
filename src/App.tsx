@@ -13,17 +13,12 @@ import { useCreateStore } from "./stores/useCreateStore";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import type { GenerationJob } from "./types";
+import { LearningPage } from "./pages/LearningPage";
+import { SignInPage } from "./pages/auth/SignInPage";
+import { DashboardPage } from "./pages/DashboardPage";
 
 function HomePage() {
-  return (
-    <>
-      <Hero />
-      <ModelShowcase />
-      <EffectsPreview />
-      <CinemaStudioTeaser />
-      <PricingTeaser />
-    </>
-  );
+  return <LearningPage />;
 }
 
 function EffectsPage() {
@@ -31,7 +26,7 @@ function EffectsPage() {
 }
 
 function CreatePageWrapper() {
-  return <CreatePage />;
+  return <DashboardPage />;
 }
 
 function ScrollRestorationWrapper() {
@@ -76,12 +71,14 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/effects" element={<EffectsPage />} />
-          <Route path="/create" element={<CreatePageWrapper />} />
           <Route path="/effects/:id" element={<EffectsPage />} />
+          <Route path="/create" element={<CreatePageWrapper />} />
           <Route path="/cinema-studio" element={<div className="min-h-screen py-20 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold mb-4">Cinema Studio</h1><p className="text-text-secondary">Coming soon...</p></div></div>} />
           <Route path="/apps" element={<div className="min-h-screen py-20 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold mb-4">Apps Marketplace</h1><p className="text-text-secondary">Coming soon...</p></div></div>} />
           <Route path="/community" element={<div className="min-h-screen py-20 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold mb-4">Community</h1><p className="text-text-secondary">Coming soon...</p></div></div>} />
           <Route path="/pricing" element={<div className="min-h-screen py-20 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold mb-4">Pricing</h1><p className="text-text-secondary">Coming soon...</p></div></div>} />
+          <Route path="/auth/signin" element={<SignInPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
         </Routes>
       </main>
       <Footer />
