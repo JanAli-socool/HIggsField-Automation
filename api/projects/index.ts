@@ -81,8 +81,17 @@ async function handleList(req: VercelRequest, res: VercelResponse, requestId: st
     prisma.project.count({ where }),
   ]);
 
+  const transformedProjects: Project[] = projects.map(p => ({
+    id: p.id,
+    userId: p.userId,
+    name: p.name,
+    description: p.description ?? undefined,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+  }));
+
   const response: PaginatedResponse<Project> = {
-    data: projects,
+    data: transformedProjects,
     total,
     page,
     page_size: pageSize,

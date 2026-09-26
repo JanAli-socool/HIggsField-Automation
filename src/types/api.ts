@@ -202,7 +202,7 @@ export interface WorkflowSelectRequest {
 
 export interface WorkflowSelectResponse {
   media_type: MediaType;
-  workflow: "text_to_image" | "image_to_image" | "image_edit" | "inpainting" | "text_to_video" | "image_to_video" | "first_frame_to_video" | "first_and_last_frame_to_video";
+  workflow: "image" | "text_to_image" | "image_to_image" | "image_edit" | "inpainting" | "text_to_video" | "image_to_video" | "first_frame_to_video" | "first_and_last_frame_to_video";
   recommended_model: Model;
   required_inputs: string[];
   reasoning: string;

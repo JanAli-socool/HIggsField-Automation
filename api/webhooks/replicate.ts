@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return errorResponse(res, "MISSING_ID", "Missing prediction ID", 400, requestId);
     }
 
-    const job = await prisma.generation.findUnique({
+    const job = await prisma.generation.findFirst({
       where: { providerJobId: id },
     });
 

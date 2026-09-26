@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { EnhancePromptRequest, EnhancePromptResponse, ApiResponse, ApiError } from "../../src/types/api.js";
+import { EnhancePromptRequest, EnhancePromptResponse, ApiResponse, ApiError, Model } from "../../src/types/api.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -101,7 +101,7 @@ async function simulateNemotronEnhancement(
   return {
     enhanced_prompt: `${enh.prefix}${prompt}${enh.suffix}`,
     negative_prompt: "low quality, blurry, distorted, deformed, ugly, bad anatomy, watermark, text, signature, watermark, username, blurry, low resolution, pixelated, artifact, noise, grain, compression artifacts",
-    model_recommendation: modelMap[mediaType] || "flux_schnell",
+    model_recommendation: (modelMap[mediaType] || "flux_schnell") as Model,
     parameters: {
       steps: mediaType.startsWith("image") ? 28 : undefined,
       guidance_scale: mediaType.startsWith("image") ? 5 : undefined,
