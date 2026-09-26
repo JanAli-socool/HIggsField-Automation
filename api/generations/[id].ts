@@ -201,20 +201,3 @@ async function handleRetry(req: VercelRequest, res: VercelResponse, job: any, re
     progress: newJob.progress,
   }, requestId);
 }
-
-function generateRequestId(): string {
-  return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function getUserId(req: VercelRequest): string {
-  return req.headers["x-user-id"] as string || "mock_user";
-}
-
-function errorResponse(res: VercelResponse, code: string, message: string, status: number, requestId: string) {
-  const error: ApiError = { code, message, request_id: requestId };
-  return res.status(status).json({ error, request_id: requestId } as ApiResponse<never>);
-}
-
-function successResponse<T>(res: VercelResponse, data: T, requestId: string, status = 200) {
-  return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
-}
