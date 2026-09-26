@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { GenerationRequest, GenerationJob, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "../../src/types/api.js";
 import { validateGeneration, submitGeneration, getGenerationStatus } from "../../src/lib/providers/registry.js";
+import prisma from "../../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
 
 const mockGenerations = new Map<string, any>();
@@ -128,7 +129,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
       return errorResponse(res, "INVALID_REQUEST", "Missing generation parameters", 400, requestId);
     }
 
-    // Sanitize prompt - remove trailing quotes/newlines
+    // Sanitize prompt
     if (body.parameters.prompt) {
       body.parameters.prompt = body.parameters.prompt.trim().replace(/^['"]|['"]$/g, '');
     }
@@ -175,7 +176,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
     // Store in mock DB
     mockGenerations.set(jobId, jobData);
 
-    // Submit to REAL provider (WanProvider for wan21, FluxProvider for flux_schnell, etc.)
+    // Submit to REAL provider (WanProvider for wan21, etc.)
     // Falls back to mock if REPLICATE_API_TOKEN not set (handled by registry)
     submitGeneration(body).then(async (completedJob) => {
       try {
@@ -246,45 +247,5 @@ async function handleList(req: VercelRequest, res: VercelResponse, requestId: st
   } catch (error) {
     console.error(`[${requestId}] handleList error:`, error);
     return errorResponse(res, "INTERNAL_ERROR", error instanceof Error ? error.message : "Failed to list generations", 500, requestId);
-  }
-}
-
-// Keep mock fallback for when REPLICATE_API_TOKEN is not set
-async function completeGenerationMock(jobId: string, validation: any): Promise<{ result_urls: string[]; thumbnail_urls: string[] }> {
-  try {
-    const params = validation.resolved_parameters;
-    const now = new Date().toISOString();
-
-    const resultUrls: string[] = [];
-    const thumbnailUrls: string[] = [];
-
-    for (let i = 0; i < params.num_outputs; i++) {
-      resultUrls.push(getPlaceholderUrl(params.media_type, i));
-      thumbnailUrls.push(getPlaceholderUrl(params.media_type, i));
-    }
-
-    const completedJob = {
-      id: jobId,
-      status: "completed",
-      progress: 100,
-      result_urls: resultUrls,
-      thumbnail_urls: thumbnailUrls,
-      completed_at: now,
-      updated_at: now,
-    };
-
-    const existing = mockGenerations.get(jobId);
-    if (existing) {
-      mockGenerations.set(jobId, { ...existing, ...completedJob });
-    }
-
-    return { result_urls: resultUrls, thumbnail_urls: thumbnailUrls };
-  } catch (error) {
-    console.error(`[${jobId}] Completion failed:`, error);
-    const existing = mockGenerations.get(jobId);
-    if (existing) {
-      mockGenerations.set(jobId, { ...existing, status: "failed", errorMessage: String(error), updated_at: new Date().toISOString() });
-    }
-    throw error;
   }
 }
