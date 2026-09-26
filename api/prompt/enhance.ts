@@ -68,7 +68,7 @@ async function simulateNemotronEnhancement(
 ): Promise<{
   enhanced_prompt: string;
   negative_prompt: string;
-  model_recommendation: string;
+  model_recommendation: Model;
   parameters: Record<string, any>;
   reasoning: string;
 }> {
