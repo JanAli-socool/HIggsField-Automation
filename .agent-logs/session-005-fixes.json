@@ -1,0 +1,36 @@
+{
+  "session_id": "session-004",
+  "timestamp": "2026-09-24T18:00:00Z",
+  "agent": "opencode",
+  "task": "Fix Vercel deployment TypeScript errors and import path issues",
+  "actions": [
+    "Fixed Vercel TypeScript errors: NextAuth CredentialsProvider import, health.ts import path, Project[] type mismatch, Model type cast",
+    "Fixed API route import paths: corrected relative paths from ../../../src/ to ../../src/ and ../../../src/ to ../../../src/ based on file depth",
+    "Fixed auth directory structure: renamed [...nextauth/].ts to [...nextauth]/index.ts",
+    "Fixed Prisma schema: added Account model for OAuth, updated CreditBalance defaults",
+    "Fixed NextAuth config: CredentialsProvider import for next-auth v4",
+    "Fixed health.ts import path to use relative path without .js extension",
+    "Fixed workflows/select.ts workflow type to include 'image'",
+    "Fixed NextAuth config: CredentialsProvider for next-auth v4",
+    "Fixed projects API: transform Prisma Date to ISO strings for Project type",
+    "Fixed prompt/enhance: cast model_recommendation to Model type",
+    "Fixed uploads: Buffer.from(file.buffer) for storage.upload",
+    "Fixed webhooks/replicate: findFirst instead of findUnique for providerJobId",
+    "Fixed types/api: add 'image' to WorkflowSelectResponse workflow union",
+    "Fixed auth config: CredentialsProvider import for next-auth v4"
+  ],
+  "fixes_by_file": {
+    "api/auth/[...nextauth]/index.ts": "Fixed import path to ../../../src/lib/auth/config.js",
+    "api/credits/index.ts": "Fixed import paths to ../../src/",
+    "api/generations/index.ts": "Fixed import paths to ../../src/",
+    "api/health.ts": "Fixed import path to ../src/types/api",
+    "api/projects/index.ts": "Transform Prisma Date to ISO strings for Project type",
+    "api/prompt/enhance.ts": "Cast model_recommendation to Model type",
+    "api/uploads/index.ts": "Buffer.from(file.buffer) for storage.upload",
+    "api/webhooks/replicate.ts": "findFirst instead of findUnique for providerJobId",
+    "api/workflows/select.ts": "Added 'image' to workflow union type",
+    "src/lib/auth/config.ts": "CredentialsProvider import for next-auth v4",
+    "src/types/api.ts": "Added 'image' to WorkflowSelectResponse workflow union",
+    "tsconfig.app.json": "Removed invalid ignoreDeprecations: '6.0'"
+  }
+}
