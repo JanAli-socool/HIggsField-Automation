@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { WorkflowSelectRequest, WorkflowSelectResponse, ApiResponse, ApiError } from "../../src/types/api.js";
+import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/middleware.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -17,6 +18,9 @@ function successResponse<T>(res: VercelResponse, data: T, requestId: string, sta
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestId = generateRequestId();
   res.setHeader("X-Request-ID", requestId);
+
+  const authReq = await withAuth(req, res);
+  if (!authReq) return;
 
   if (req.method !== "POST") {
     return res.status(405).json({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed", request_id: requestId } });

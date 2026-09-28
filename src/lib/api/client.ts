@@ -21,6 +21,7 @@ async function fetchApi<T>(
 
   const response = await fetch(url, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       "X-Request-ID": requestId,
@@ -98,6 +99,7 @@ export const api = {
 
       const response = await fetch("/api/uploads", {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
 

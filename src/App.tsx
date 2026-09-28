@@ -16,6 +16,7 @@ import type { GenerationJob } from "./types";
 import { LearningPage } from "./pages/LearningPage";
 import { SignInPage } from "./pages/auth/SignInPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { AuthProvider } from "./lib/auth/context";
 
 function HomePage() {
   return <LearningPage />;
@@ -93,16 +94,18 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AnimatePresence mode="wait">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="min-h-screen bg-bg text-text-primary"
-        >
-          <AppRoutes />
-        </motion.div>
-      </AnimatePresence>
+      <AuthProvider>
+        <AnimatePresence mode="wait">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="min-h-screen bg-bg text-text-primary"
+          >
+            <AppRoutes />
+          </motion.div>
+        </AnimatePresence>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

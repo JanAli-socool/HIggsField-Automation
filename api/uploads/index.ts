@@ -3,6 +3,7 @@ import { ApiResponse, ApiError } from "../../src/types/api.js";
 import { v4 as uuidv4 } from "uuid";
 import { parseMultipartFormData } from "../../src/lib/upload/parser.js";
 import { storage, generateThumbnail, generateVideoThumbnails } from "../../src/lib/storage/index.js";
+import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/middleware.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -32,6 +33,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestId = generateRequestId();
   res.setHeader("X-Request-ID", requestId);
 
+  const authReq = await withAuth(req, res);
+  if (!authReq) return;
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed", request_id: requestId } });
   }
@@ -60,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const uploadId = uuidv4();
     const ext = file.name.split(".").pop() || (type === "image" ? "webp" : "mp4");
-    const fileName = `uploads/${uploadId}.${ext}`;
+    const fileName = `uploads/${authReq.user.id}/${uploadId}.${ext}`;
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     const result = await storage.upload(fileName, Buffer.from(file.buffer), {

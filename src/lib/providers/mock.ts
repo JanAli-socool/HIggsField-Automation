@@ -7,8 +7,8 @@ import type {
   FailureType,
 } from "../../types/api.js";
 import { BaseProvider, GenerationProvider, ProviderConfig } from "./base.js";
+import prisma from "../db/client.js";
 
-const MOCK_JOBS = new Map<string, GenerationJob>();
 const MOCK_DELAYS: Record<string, number> = {
   image: 2000,
   image_to_image: 3000,
@@ -177,11 +177,11 @@ export class MockProvider extends BaseProvider implements GenerationProvider {
       throw new Error(`Validation failed: ${validation.errors.join(", ")}`)
     }
 
-    const jobId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+    const jobId = generateId()
     const now = new Date().toISOString()
     const params = validation.resolved_parameters
 
-    // Generate result URLs immediately
+    // Generate result URLs immediately for completed jobs
     const resultUrls: string[] = []
     const thumbnailUrls: string[] = []
 
@@ -194,88 +194,133 @@ export class MockProvider extends BaseProvider implements GenerationProvider {
       id: jobId,
       user_id: "mock_user",
       project_id: request.project_id || null,
-      status: "completed",
-      progress: 100,
+      status: "queued",
+      progress: 0,
       request,
       result_urls: resultUrls,
       thumbnail_urls: thumbnailUrls,
       credit_cost: validation.estimated_credits,
       created_at: now,
       updated_at: now,
-      completed_at: now,
+      provider_job_id: jobId,
     }
 
-    MOCK_JOBS.set(jobId, job)
+    // Persist to database
+    await prisma.generation.update({
+      where: { id: jobId },
+      data: {
+        status: "queued",
+        progress: 0,
+        providerJobId: jobId,
+        outputAssetUrls: [],
+        thumbnailUrls: [],
+        updatedAt: new Date(),
+      },
+    }).catch(() => {
+      // Job might not exist in DB yet if called directly
+      console.log(`[MockProvider] Job ${jobId} not found in DB, will be created by API`);
+    });
 
-    // Simulate progress for local dev (non-blocking)
-    if (!isServerless()) {
-      this.simulateProgressAsync(jobId, params).catch(console.error)
-    }
+    // Simulate progress asynchronously
+    this.simulateProgressAsync(jobId, params).catch(console.error)
 
     return job
   }
 
   private async simulateProgressAsync(jobId: string, params: GenerationParameters): Promise<void> {
-    const job = MOCK_JOBS.get(jobId)
-    if (!job) return
-
-    const updateStatus = (status: JobStatus, progress: number) => {
-      const existing = MOCK_JOBS.get(jobId)
-      if (existing) {
-        MOCK_JOBS.set(jobId, { ...existing, status, progress, updated_at: new Date().toISOString() })
-      }
+    const updateStatus = async (status: JobStatus, progress: number, resultUrls?: string[]) => {
+      await prisma.generation.update({
+        where: { id: jobId },
+        data: {
+          status,
+          progress,
+          outputAssetUrls: resultUrls || [],
+          updatedAt: new Date(),
+          completedAt: status === "completed" ? new Date() : null,
+        },
+      }).catch((err) => {
+        console.error(`[MockProvider] Failed to update job ${jobId}:`, err);
+      });
     }
 
-    simulateProgressSync(params.media_type, updateStatus)
+    // Initial status updates
+    await updateStatus("validating_input", 5);
+    await updateStatus("preparing_model", 15);
+    await updateStatus("generating", 50);
+    await updateStatus("generating", 90);
+    await updateStatus("encoding", 95);
+    await updateStatus("uploading", 98);
 
-    // Job already has result URLs from submit, just mark as completed
-    const finalJob = MOCK_JOBS.get(jobId)
-    if (finalJob) {
-      MOCK_JOBS.set(jobId, {
-        ...finalJob,
-        status: "completed",
-        progress: 100,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-    }
+    // Final completion
+    await updateStatus("completed", 100, params.num_outputs > 0 
+      ? Array.from({ length: params.num_outputs }, (_, i) => getPlaceholderUrl(params.media_type, i))
+      : []);
   }
 
   async getStatus(jobId: string): Promise<{ status: JobStatus; progress: number; resultUrls?: string[]; error?: string; failureType?: FailureType }> {
-    const job = MOCK_JOBS.get(jobId)
+    const job = await prisma.generation.findUnique({ where: { id: jobId } })
     if (!job) {
       return { status: "failed", progress: 0, error: "Job not found", failureType: "generation_failed" }
+    }
+
+    const status = job.status as JobStatus;
+    
+    // For terminal states, return immediately
+    if (["completed", "failed", "cancelled"].includes(status)) {
+      return {
+        status,
+        progress: job.progress,
+        resultUrls: job.outputAssetUrls.length > 0 ? job.outputAssetUrls : undefined,
+        error: job.errorMessage || undefined,
+        failureType: job.failureType as FailureType,
+      };
+    }
+
+    // For non-terminal states in serverless, complete immediately
+    if (isServerless() && ["queued", "preparing_model", "generating", "validating_input", "encoding", "uploading"].includes(status)) {
+      // Simulate completion in serverless
+      await this.simulateProgressAsync(jobId, job.parameters as unknown as GenerationParameters);
+      
+      const updatedJob = await prisma.generation.findUnique({ where: { id: jobId } });
+      if (updatedJob) {
+        return {
+          status: updatedJob.status as JobStatus,
+          progress: updatedJob.progress,
+          resultUrls: updatedJob.outputAssetUrls.length > 0 ? updatedJob.outputAssetUrls : undefined,
+          error: updatedJob.errorMessage || undefined,
+          failureType: updatedJob.failureType as FailureType,
+        };
+      }
     }
 
     return {
       status: job.status as JobStatus,
       progress: job.progress,
-      resultUrls: job.result_urls.length > 0 ? job.result_urls : undefined,
-      error: job.error_message,
-      failureType: job.failure_type as FailureType,
+      resultUrls: job.outputAssetUrls.length > 0 ? job.outputAssetUrls : undefined,
+      error: job.errorMessage || undefined,
+      failureType: job.failureType as FailureType,
     }
   }
 
   async cancel(jobId: string): Promise<void> {
-    const job = MOCK_JOBS.get(jobId)
-    if (job && (job.status === "queued" || job.status === "generating")) {
-      MOCK_JOBS.set(jobId, {
-        ...job,
+    await prisma.generation.update({
+      where: { id: jobId },
+      data: {
         status: "cancelled",
-        updated_at: new Date().toISOString(),
-      })
-    }
+        updatedAt: new Date(),
+      },
+    }).catch(console.error);
   }
 
   async retry(jobId: string): Promise<GenerationJob> {
-    const originalJob = MOCK_JOBS.get(jobId)
+    const originalJob = await prisma.generation.findUnique({ where: { id: jobId } })
     if (!originalJob) {
       throw new Error("Original job not found")
     }
 
-    const newJobId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+    const newJobId = generateId()
     const now = new Date().toISOString()
-    const params = originalJob.request.parameters
+    const params = originalJob.parameters as unknown as GenerationParameters
 
     const resultUrls: string[] = []
     const thumbnailUrls: string[] = []
@@ -285,34 +330,47 @@ export class MockProvider extends BaseProvider implements GenerationProvider {
       thumbnailUrls.push(getPlaceholderUrl(params.media_type, i))
     }
 
-    const newJob: GenerationJob = {
-      id: newJobId,
-      user_id: originalJob.user_id,
-      project_id: originalJob.project_id,
-      status: "completed",
-      progress: 100,
-      request: originalJob.request,
+    const newJob = await prisma.generation.create({
+      data: {
+        id: newJobId,
+        userId: originalJob.userId,
+        projectId: originalJob.projectId,
+        mediaType: originalJob.mediaType,
+        model: originalJob.model,
+        originalPrompt: originalJob.originalPrompt,
+        enhancedPrompt: originalJob.enhancedPrompt,
+        negativePrompt: originalJob.negativePrompt,
+        status: "completed",
+        progress: 100,
+        inputAssetUrl: originalJob.inputAssetUrl,
+        maskUrl: originalJob.maskUrl,
+        firstFrameImageUrl: originalJob.firstFrameImageUrl,
+        lastFrameImageUrl: originalJob.lastFrameImageUrl,
+        outputAssetUrls: resultUrls,
+        thumbnailUrls: thumbnailUrls,
+        parameters: originalJob.parameters,
+        providerJobId: newJobId,
+        creditCost: originalJob.creditCost,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        completedAt: new Date(),
+      },
+    });
+
+    return {
+      id: newJob.id,
+      user_id: newJob.userId,
+      project_id: newJob.projectId,
+      status: newJob.status as JobStatus,
+      progress: newJob.progress,
+      request: originalJob.parameters as any,
       result_urls: resultUrls,
       thumbnail_urls: thumbnailUrls,
-      credit_cost: originalJob.credit_cost,
-      created_at: now,
-      updated_at: now,
-      completed_at: now,
+      credit_cost: newJob.creditCost,
+      created_at: newJob.createdAt.toISOString(),
+      updated_at: newJob.updatedAt.toISOString(),
+      completed_at: newJob.completedAt?.toISOString(),
+      provider_job_id: newJob.providerJobId,
     }
-
-    MOCK_JOBS.set(newJobId, newJob)
-    return newJob
-  }
-
-  static getJob(jobId: string): GenerationJob | undefined {
-    return MOCK_JOBS.get(jobId)
-  }
-
-  static getAllJobs(): GenerationJob[] {
-    return Array.from(MOCK_JOBS.values())
-  }
-
-  static clearJobs(): void {
-    MOCK_JOBS.clear()
   }
 }

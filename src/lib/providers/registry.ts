@@ -7,7 +7,7 @@ import type {
   JobStatus,
   FailureType,
 } from "../../types/api.js";
-import { GenerationProvider, ProviderConfig } from "./base.js";
+import { BaseProvider, GenerationProvider, ProviderConfig } from "./base.js";
 import { MockProvider } from "./mock.js";
 import { FluxProvider } from "./flux.js";
 import { SDXLProvider } from "./sdxl.js";
@@ -15,6 +15,7 @@ import { QwenImageProvider } from "./qwen.js";
 import { WanProvider } from "./wan.js";
 import { LTXProvider } from "./ltx.js";
 import { HunyuanProvider } from "./hunyuan.js";
+import prisma from "../db/client.js";
 
 type ModelName = GenerationParameters["model"];
 
@@ -41,7 +42,6 @@ class ProviderRegistry {
   private initializeDefaultProviders(): void {
     if (this.useMock) {
       console.log("[ProviderRegistry] No valid REPLICATE_API_TOKEN, using MockProvider for all models");
-      // Register mock provider for all supported models
       const mockProvider = new MockProvider({ apiKey: "mock_key" });
       const allModels: ModelName[] = [
         "flux_schnell", "sdxl", "qwen_image",
@@ -134,11 +134,12 @@ export async function retryGeneration(jobId: string): Promise<GenerationJob> {
 }
 
 function getProviderFromJobId(jobId: string): GenerationProvider {
-  // If using mock mode or jobId is a UUID (not provider-prefixed), use mock
+  // Check if we're in mock mode
   if (providerRegistry.getProvider("flux_schnell") instanceof MockProvider) {
     return providerRegistry.getProvider("flux_schnell");
   }
-  
+
+  // For real providers, determine from job ID prefix
   if (jobId.startsWith("flux_")) return providerRegistry.getProvider("flux_schnell");
   if (jobId.startsWith("sdxl_")) return providerRegistry.getProvider("sdxl");
   if (jobId.startsWith("qwen_")) return providerRegistry.getProvider("qwen_image");
@@ -146,8 +147,8 @@ function getProviderFromJobId(jobId: string): GenerationProvider {
   if (jobId.startsWith("ltx_")) return providerRegistry.getProvider("ltx");
   if (jobId.startsWith("hunyuan_")) return providerRegistry.getProvider("hunyuan");
   if (jobId.startsWith("mock_")) return providerRegistry.getProvider("flux_schnell");
-  
-  // UUID-based job IDs (from mock mode) - use mock provider
+
+  // UUID-based job IDs (from database) - use mock provider for status checking in mock mode
   return providerRegistry.getProvider("flux_schnell");
 }
 
