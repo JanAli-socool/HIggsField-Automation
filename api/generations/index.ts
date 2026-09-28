@@ -117,7 +117,7 @@ async function handleCreate(req: AuthenticatedRequest, res: VercelResponse, requ
           data: {
             status: providerStatus.status,
             progress: providerStatus.progress,
-            provider_job_id: providerJob.providerJobId,
+            provider_job_id: providerJob.provider_job_id,
             output_asset_urls: providerStatus.resultUrls || [],
             thumbnail_urls: providerStatus.resultUrls?.map((_, i) => getPlaceholderUrl(validation.resolved_parameters.media_type, i)) || [],
             error_message: providerStatus.error,

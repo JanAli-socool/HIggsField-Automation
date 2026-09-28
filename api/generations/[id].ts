@@ -167,7 +167,7 @@ async function handleRetry(req: VercelRequest, res: VercelResponse, job: any, re
   const providerJob = await retryGeneration(job.id);
   await prisma.generation.update({
     where: { id: newJob.id },
-    data: { provider_job_id: providerJob.providerJobId },
+    data: { provider_job_id: providerJob.provider_job_id },
   });
 
   return successResponse(res, {
