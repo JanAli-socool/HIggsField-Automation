@@ -1,15 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Project, ApiResponse, ApiError, PaginatedResponse } from "../../src/types/api.js";
 import prisma from "../../src/lib/db/client.js";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../src/lib/auth/config.js";
+import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/middleware.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function getUserId(req: VercelRequest): string | null {
-  return req.headers["x-user-id"] as string || null;
 }
 
 function errorResponse(res: VercelResponse, code: string, message: string, status: number, requestId: string) {
@@ -25,19 +20,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestId = generateRequestId();
   res.setHeader("X-Request-ID", requestId);
 
-  const session = await getServerSession(req, res, authOptions);
-  const userId = session?.user?.id || getUserId(req);
-
-  if (!userId) {
-    return errorResponse(res, "UNAUTHORIZED", "Authentication required", 401, requestId);
-  }
+  const authReq = await withAuth(req, res);
+  if (!authReq) return;
 
   try {
     switch (req.method) {
       case "POST":
-        return await handleCreate(req, res, requestId, userId);
+        return await handleCreate(req, res, requestId, authReq.user.id);
       case "GET":
-        return await handleList(req, res, requestId, userId);
+        return await handleList(req, res, requestId, authReq.user.id);
       default:
         return errorResponse(res, "METHOD_NOT_ALLOWED", "Method not allowed", 405, requestId);
     }
@@ -56,7 +47,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
 
   const project = await prisma.project.create({
     data: {
-      userId,
+      user_id: userId,
       name: name.trim(),
       description: description?.trim(),
     },
@@ -64,11 +55,11 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
 
   return successResponse(res, {
     id: project.id,
-    user_id: project.userId,
+    user_id: project.user_id,
     name: project.name,
     description: project.description ?? undefined,
-    created_at: project.createdAt.toISOString(),
-    updated_at: project.updatedAt.toISOString(),
+    created_at: project.created_at,
+    updated_at: project.updated_at,
   }, requestId, 201);
 }
 
@@ -76,12 +67,12 @@ async function handleList(req: VercelRequest, res: VercelResponse, requestId: st
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const pageSize = Math.min(50, Math.max(1, parseInt(req.query.page_size as string) || 20));
 
-  const where = { userId };
+  const where = { user_id: userId };
 
   const [projects, total] = await Promise.all([
     prisma.project.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: { created_at: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -90,11 +81,11 @@ async function handleList(req: VercelRequest, res: VercelResponse, requestId: st
 
   const transformedProjects: Project[] = projects.map(p => ({
     id: p.id,
-    user_id: p.userId,
+    user_id: p.user_id,
     name: p.name,
     description: p.description ?? undefined,
-    created_at: p.createdAt.toISOString(),
-    updated_at: p.updatedAt.toISOString(),
+    created_at: p.created_at,
+    updated_at: p.updated_at,
   }));
 
   const response: PaginatedResponse<Project> = {

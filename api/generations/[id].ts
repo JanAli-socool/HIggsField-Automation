@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return errorResponse(res, "NOT_FOUND", "Job not found", 404, requestId);
     }
 
-    if (job.userId !== userId) {
+    if (job.user_id !== userId) {
       return errorResponse(res, "FORBIDDEN", "Access denied", 403, requestId);
     }
 
@@ -65,12 +65,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 async function handleGet(req: VercelRequest, res: VercelResponse, job: any, requestId: string) {
-  // Always fetch fresh status from provider for non-terminal states
   let status = job.status;
   let progress = job.progress;
-  let resultUrls = job.outputAssetUrls;
-  let errorMessage = job.errorMessage;
-  let failureType = job.failureType;
+  let resultUrls = job.output_asset_urls;
+  let errorMessage = job.error_message;
+  let failureType = job.failure_type;
 
   if (["queued", "preparing_model", "generating", "validating_input", "encoding", "uploading"].includes(job.status)) {
     try {
@@ -78,20 +77,19 @@ async function handleGet(req: VercelRequest, res: VercelResponse, job: any, requ
       status = providerStatus.status;
       progress = providerStatus.progress;
       if (providerStatus.resultUrls?.length) resultUrls = providerStatus.resultUrls;
-      errorMessage = providerStatus.error || job.errorMessage;
-      failureType = providerStatus.failureType || job.failureType;
+      errorMessage = providerStatus.error || job.error_message;
+      failureType = providerStatus.failureType || job.failure_type;
 
-      // Update database with fresh status
       await prisma.generation.update({
         where: { id: job.id },
         data: {
           status,
           progress,
-          outputAssetUrls: resultUrls,
-          errorMessage,
-          failureType,
-          completedAt: ["completed", "failed", "cancelled"].includes(status) ? new Date() : null,
-          updatedAt: new Date(),
+          output_asset_urls: resultUrls,
+          error_message: errorMessage,
+          failure_type: failureType,
+          completed_at: ["completed", "failed", "cancelled"].includes(status) ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
         },
       });
     } catch (error) {
@@ -101,20 +99,20 @@ async function handleGet(req: VercelRequest, res: VercelResponse, job: any, requ
 
   return successResponse(res, {
     id: job.id,
-    userId: job.userId,
-    projectId: job.projectId,
+    user_id: job.user_id,
+    project_id: job.project_id,
     status,
     progress,
     request: job.parameters,
     resultUrls,
-    thumbnailUrls: job.thumbnailUrls,
+    thumbnailUrls: job.thumbnail_urls,
     errorMessage,
     failureType,
-    providerJobId: job.providerJobId,
-    creditCost: job.creditCost,
-    createdAt: job.createdAt.toISOString(),
-    updatedAt: job.updatedAt.toISOString(),
-    completedAt: job.completedAt?.toISOString(),
+    providerJobId: job.provider_job_id,
+    creditCost: job.credit_cost,
+    createdAt: job.created_at,
+    updatedAt: job.updated_at,
+    completedAt: job.completed_at,
   }, requestId);
 }
 
@@ -131,7 +129,7 @@ async function handleCancel(req: VercelRequest, res: VercelResponse, job: any, r
 
   const cancelledJob = await prisma.generation.update({
     where: { id: job.id },
-    data: { status: "cancelled", updatedAt: new Date() },
+    data: { status: "cancelled", updated_at: new Date().toISOString() },
   });
 
   return successResponse(res, { id: cancelledJob.id, status: "cancelled" }, requestId);
@@ -142,36 +140,34 @@ async function handleRetry(req: VercelRequest, res: VercelResponse, job: any, re
     return errorResponse(res, "INVALID_STATE", `Cannot retry job in ${job.status} state`, 400, requestId);
   }
 
-  // Create new job based on original
   const newJob = await prisma.generation.create({
     data: {
-      userId: job.userId,
-      projectId: job.projectId,
-      mediaType: job.mediaType,
+      user_id: job.user_id,
+      project_id: job.project_id,
+      media_type: job.media_type,
       model: job.model,
-      originalPrompt: job.originalPrompt,
-      enhancedPrompt: job.enhancedPrompt,
-      negativePrompt: job.negativePrompt,
+      original_prompt: job.original_prompt,
+      enhanced_prompt: job.enhanced_prompt,
+      negative_prompt: job.negative_prompt,
       status: "queued",
       progress: 0,
-      inputAssetUrl: job.inputAssetUrl,
-      maskUrl: job.maskUrl,
-      firstFrameImageUrl: job.firstFrameImageUrl,
-      lastFrameImageUrl: job.lastFrameImageUrl,
-      outputAssetUrls: [],
-      thumbnailUrls: [],
+      input_asset_url: job.input_asset_url,
+      mask_url: job.mask_url,
+      first_frame_image_url: job.first_frame_image_url,
+      last_frame_image_url: job.last_frame_image_url,
+      output_asset_urls: [],
+      thumbnail_urls: [],
       parameters: job.parameters,
-      creditCost: job.creditCost,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      credit_cost: job.credit_cost,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     },
   });
 
-  // Submit to provider
   const providerJob = await retryGeneration(job.id);
   await prisma.generation.update({
     where: { id: newJob.id },
-    data: { providerJobId: providerJob.providerJobId },
+    data: { provider_job_id: providerJob.providerJobId },
   });
 
   return successResponse(res, {

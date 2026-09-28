@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
+import { USE_MOCK } from "../db/client.js";
 import prisma from "../db/client.js";
 
 declare module "next-auth" {
@@ -30,8 +31,15 @@ declare module "next-auth/jwt" {
   }
 }
 
+function getAdapter() {
+  if (USE_MOCK) {
+    return undefined;
+  }
+  return PrismaAdapter(prisma as any) as any;
+}
+
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
+  adapter: getAdapter(),
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60,
@@ -43,12 +51,20 @@ export const authOptions: NextAuthOptions = {
   },
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID || "mock_google_client_id",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "mock_google_client_secret",
+      authorization: {
+        params: {
+          scope: "openid email profile",
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code",
+        },
+      },
     }),
     GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      clientId: process.env.GITHUB_CLIENT_ID || "mock_github_client_id",
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || "mock_github_client_secret",
     }),
     CredentialsProvider({
       name: "credentials",
@@ -65,11 +81,11 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         });
 
-        if (!user || !user.passwordHash) {
+        if (!user || !(user as any).passwordHash) {
           throw new Error("Invalid credentials");
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+        const isValid = await bcrypt.compare(credentials.password, (user as any).passwordHash);
         if (!isValid) {
           throw new Error("Invalid credentials");
         }
@@ -78,12 +94,57 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name || undefined,
-          avatarUrl: user.avatarUrl || undefined,
+          avatarUrl: user.avatar_url || undefined,
         };
       },
     }),
   ],
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "google" || account?.provider === "github") {
+        const existingUser = await prisma.user.findUnique({
+          where: { email: user.email! },
+        });
+
+        if (!existingUser) {
+          const newUser = await prisma.user.create({
+            data: {
+              email: user.email!,
+              name: user.name || undefined,
+              avatar_url: user.image || undefined,
+            },
+          });
+          user.id = newUser.id;
+        } else {
+          user.id = existingUser.id;
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: {
+              name: user.name || existingUser.name,
+              avatar_url: user.image || existingUser.avatar_url,
+            },
+          });
+        }
+
+        if (account) {
+          await (prisma as any).account.create({
+            data: {
+              user_id: user.id,
+              type: "oauth",
+              provider: account.provider,
+              provider_account_id: account.providerAccountId,
+              access_token: account.access_token,
+              refresh_token: account.refresh_token,
+              expires_at: account.expires_at,
+              token_type: account.token_type,
+              scope: account.scope,
+              id_token: account.id_token,
+            },
+          });
+        }
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -97,5 +158,5 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || "mock-secret-key-for-development-only-min-32-chars",
 };

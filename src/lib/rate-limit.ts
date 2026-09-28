@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import prisma from "../lib/db/client.js";
+import prisma from "./db/client.js";
 
 interface RateLimitConfig {
   windowMs: number;
@@ -13,40 +13,36 @@ const defaultConfig: RateLimitConfig = {
   keyPrefix: "ratelimit",
 };
 
+const memoryStore = new Map<string, { count: number; resetAt: number }>();
+
 export async function rateLimit(
   req: VercelRequest,
   res: VercelResponse,
   config: Partial<RateLimitConfig> = {}
 ): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
   const { windowMs, maxRequests, keyPrefix } = { ...defaultConfig, ...config };
-  const ip = req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "unknown";
+  const ip = req.headers["x-forwarded-for"] as string || req.socket?.remoteAddress || "unknown";
   const key = `${keyPrefix}:${ip}`;
   const now = Date.now();
-  const windowStart = now - windowMs;
 
   try {
-    const existing = await prisma.rateLimit.findUnique({ where: { key } });
+    let existing = memoryStore.get(key);
 
-    if (!existing || existing.resetAt.getTime() < now) {
+    if (!existing || existing.resetAt < now) {
       const resetAt = now + windowMs;
-      await prisma.rateLimit.upsert({
-        where: { key },
-        create: { key, count: 1, window: windowMs, resetAt: new Date(resetAt) },
-        update: { count: 1, resetAt: new Date(resetAt) },
-      });
+      existing = { count: 1, resetAt };
+      memoryStore.set(key, existing);
       return { allowed: true, remaining: maxRequests - 1, resetAt };
     }
 
     if (existing.count >= maxRequests) {
-      return { allowed: false, remaining: 0, resetAt: existing.resetAt.getTime() };
+      return { allowed: false, remaining: 0, resetAt: existing.resetAt };
     }
 
-    await prisma.rateLimit.update({
-      where: { key },
-      data: { count: existing.count + 1 },
-    });
+    existing.count += 1;
+    memoryStore.set(key, existing);
 
-    return { allowed: true, remaining: maxRequests - existing.count - 1, resetAt: existing.resetAt.getTime() };
+    return { allowed: true, remaining: maxRequests - existing.count, resetAt: existing.resetAt };
   } catch (error) {
     console.error("Rate limit error:", error);
     return { allowed: true, remaining: maxRequests, resetAt: now + windowMs };

@@ -18,25 +18,6 @@ function getPlaceholderUrl(mediaType: string, index: number = 0): string {
   return PLACEHOLDER_VIDEOS[index % PLACEHOLDER_VIDEOS.length];
 }
 
-function estimateCredits(params: any): number {
-  const baseCosts: Record<string, number> = {
-    image: 1,
-    image_to_image: 2,
-    image_edit: 3,
-    inpainting: 3,
-    text_to_video: 10,
-    image_to_video: 12,
-    first_frame_to_video: 12,
-    first_and_last_frame_to_video: 15,
-  };
-  let cost = baseCosts[params.media_type] || 1;
-  if (params.num_outputs > 1) cost *= params.num_outputs;
-  if (params.quality === "high") cost *= 2;
-  if (params.quality === "preview") cost = Math.ceil(cost * 0.5);
-  if (params.duration_seconds && params.duration_seconds > 5) cost *= Math.ceil(params.duration_seconds / 5);
-  return cost;
-}
-
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
@@ -81,12 +62,10 @@ async function handleCreate(req: AuthenticatedRequest, res: VercelResponse, requ
       return errorResponse(res, "INVALID_REQUEST", "Missing generation parameters", 400, requestId);
     }
 
-    // Sanitize prompt
     if (body.parameters.prompt) {
       body.parameters.prompt = body.parameters.prompt.trim().replace(/^['"]|['"]$/g, '');
     }
 
-    // Validate via provider registry
     const validation = await validateGeneration(body);
     if (!validation.valid) {
       return errorResponse(res, "VALIDATION_FAILED", validation.errors.join(", "), 400, requestId);
@@ -94,46 +73,42 @@ async function handleCreate(req: AuthenticatedRequest, res: VercelResponse, requ
 
     console.log(`[${requestId}] Validation passed for model: ${validation.selected_model}`);
 
-    // Check user credits
-    const userCredits = await prisma.creditBalance.findUnique({ where: { userId } });
+    const userCredits = await prisma.creditBalance.findUnique({ where: { user_id: userId } });
     const availableCredits = userCredits?.balance || 100;
     if (availableCredits < validation.estimated_credits) {
       return errorResponse(res, "INSUFFICIENT_CREDITS", `Need ${validation.estimated_credits} credits, have ${availableCredits}`, 402, requestId);
     }
 
-    // Create job in database
     const job = await prisma.generation.create({
       data: {
         id: uuidv4(),
-        userId,
-        projectId: body.project_id || null,
-        mediaType: validation.resolved_parameters.media_type,
+        user_id: userId,
+        project_id: body.project_id || null,
+        media_type: validation.resolved_parameters.media_type,
         model: validation.selected_model,
-        originalPrompt: validation.resolved_parameters.prompt,
-        enhancedPrompt: validation.resolved_parameters.prompt,
-        negativePrompt: validation.resolved_parameters.negative_prompt,
+        original_prompt: validation.resolved_parameters.prompt,
+        enhanced_prompt: validation.resolved_parameters.prompt,
+        negative_prompt: validation.resolved_parameters.negative_prompt,
         status: "queued",
         progress: 0,
-        inputAssetUrl: validation.resolved_parameters.input_image_url,
-        maskUrl: validation.resolved_parameters.mask_url,
-        firstFrameImageUrl: validation.resolved_parameters.first_frame_image_url,
-        lastFrameImageUrl: validation.resolved_parameters.last_frame_image_url,
-        outputAssetUrls: [],
-        thumbnailUrls: [],
+        input_asset_url: validation.resolved_parameters.input_image_url,
+        mask_url: validation.resolved_parameters.mask_url,
+        first_frame_image_url: validation.resolved_parameters.first_frame_image_url,
+        last_frame_image_url: validation.resolved_parameters.last_frame_image_url,
+        output_asset_urls: [],
+        thumbnail_urls: [],
         parameters: validation.resolved_parameters as any,
-        creditCost: validation.estimated_credits,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        credit_cost: validation.estimated_credits,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       },
     });
 
-    // Deduct credits immediately
     await prisma.creditBalance.update({
-      where: { userId },
-      data: { balance: { decrement: validation.estimated_credits }, totalConsumed: { increment: validation.estimated_credits } },
+      where: { user_id: userId },
+      data: { balance: { decrement: validation.estimated_credits }, total_consumed: { increment: validation.estimated_credits } },
     });
 
-    // Submit to provider asynchronously
     submitGeneration(body).then(async (providerJob) => {
       try {
         const providerStatus = await getGenerationStatus(providerJob.id);
@@ -142,13 +117,13 @@ async function handleCreate(req: AuthenticatedRequest, res: VercelResponse, requ
           data: {
             status: providerStatus.status,
             progress: providerStatus.progress,
-            providerJobId: providerJob.providerJobId,
-            outputAssetUrls: providerStatus.resultUrls || [],
-            thumbnailUrls: providerStatus.resultUrls?.map((_, i) => getPlaceholderUrl(validation.resolved_parameters.media_type, i)) || [],
-            errorMessage: providerStatus.error,
-            failureType: providerStatus.failureType,
-            completedAt: providerStatus.status === "completed" || providerStatus.status === "failed" ? new Date() : null,
-            updatedAt: new Date(),
+            provider_job_id: providerJob.providerJobId,
+            output_asset_urls: providerStatus.resultUrls || [],
+            thumbnail_urls: providerStatus.resultUrls?.map((_, i) => getPlaceholderUrl(validation.resolved_parameters.media_type, i)) || [],
+            error_message: providerStatus.error,
+            failure_type: providerStatus.failureType,
+            completed_at: providerStatus.status === "completed" || providerStatus.status === "failed" ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
           },
         });
       } catch (error) {
@@ -157,9 +132,9 @@ async function handleCreate(req: AuthenticatedRequest, res: VercelResponse, requ
           where: { id: job.id },
           data: {
             status: "failed",
-            errorMessage: error instanceof Error ? error.message : "Generation failed",
-            failureType: "provider_error",
-            updatedAt: new Date(),
+            error_message: error instanceof Error ? error.message : "Generation failed",
+            failure_type: "provider_error",
+            updated_at: new Date().toISOString(),
           },
         });
       }
@@ -169,9 +144,9 @@ async function handleCreate(req: AuthenticatedRequest, res: VercelResponse, requ
         where: { id: job.id },
         data: {
           status: "failed",
-          errorMessage: error instanceof Error ? error.message : "Generation failed",
-          failureType: "provider_error",
-          updatedAt: new Date(),
+          error_message: error instanceof Error ? error.message : "Generation failed",
+          failure_type: "provider_error",
+          updated_at: new Date().toISOString(),
         },
       });
     });
@@ -191,14 +166,14 @@ async function handleList(req: AuthenticatedRequest, res: VercelResponse, reques
     const status = req.query.status as string | undefined;
     const mediaType = req.query.media_type as string | undefined;
 
-    const where: any = { userId };
+    const where: any = { user_id: userId };
     if (status) where.status = status;
-    if (mediaType) where.mediaType = mediaType;
+    if (mediaType) where.media_type = mediaType;
 
     const [jobs, total] = await Promise.all([
       prisma.generation.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { created_at: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -209,12 +184,12 @@ async function handleList(req: AuthenticatedRequest, res: VercelResponse, reques
       id: j.id,
       status: j.status as any,
       progress: j.progress,
-      media_type: j.mediaType as any,
+      media_type: j.media_type as any,
       model: j.model as any,
-      prompt: j.originalPrompt,
-      thumbnail_url: j.thumbnailUrls[0] || null,
-      created_at: j.createdAt.toISOString(),
-      completed_at: j.completedAt?.toISOString(),
+      prompt: j.original_prompt,
+      thumbnail_url: j.thumbnail_urls[0] || null,
+      created_at: j.created_at,
+      completed_at: j.completed_at,
     }));
 
     const response: PaginatedResponse<GenerationJobListItem> = {

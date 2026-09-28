@@ -15,6 +15,9 @@ import { useEffect } from "react";
 import type { GenerationJob } from "./types";
 import { LearningPage } from "./pages/LearningPage";
 import { SignInPage } from "./pages/auth/SignInPage";
+import { SignUpPage } from "./pages/auth/SignUpPage";
+import { SignOutPage } from "./pages/auth/SignOutPage";
+import { AuthErrorPage } from "./pages/auth/AuthErrorPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { AuthProvider } from "./lib/auth/context";
 
@@ -79,6 +82,9 @@ function AppRoutes() {
           <Route path="/community" element={<div className="min-h-screen py-20 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold mb-4">Community</h1><p className="text-text-secondary">Coming soon...</p></div></div>} />
           <Route path="/pricing" element={<div className="min-h-screen py-20 flex items-center justify-center"><div className="text-center"><h1 className="text-4xl font-bold mb-4">Pricing</h1><p className="text-text-secondary">Coming soon...</p></div></div>} />
           <Route path="/auth/signin" element={<SignInPage />} />
+          <Route path="/auth/signup" element={<SignUpPage />} />
+          <Route path="/auth/signout" element={<SignOutPage />} />
+          <Route path="/auth/error" element={<AuthErrorPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
         </Routes>
       </main>

@@ -95,18 +95,29 @@ export interface GenerationJob {
   id: string;
   user_id: string;
   project_id: string | null;
+  media_type?: string;
+  model?: string;
+  original_prompt?: string;
+  enhanced_prompt?: string;
+  negative_prompt?: string;
   status: JobStatus;
   progress: number;
-  request: GenerationRequest;
-  result_urls: string[];
-  thumbnail_urls: string[];
-  error_message?: string;
-  failure_type?: FailureType;
-  provider_job_id?: string;
-  credit_cost: number;
+  input_asset_url?: string | null;
+  mask_url?: string | null;
+  first_frame_image_url?: string | null;
+  last_frame_image_url?: string | null;
+  output_asset_urls?: string[];
+  result_urls?: string[];
+  thumbnail_urls?: string[];
+  parameters?: GenerationParameters;
+  request?: GenerationRequest;
+  provider_job_id?: string | null;
+  credit_cost?: number;
+  error_message?: string | null;
+  failure_type?: string | null;
   created_at: string;
   updated_at: string;
-  completed_at?: string;
+  completed_at?: string | null;
 }
 
 export interface GenerationJobListItem {
@@ -148,9 +159,12 @@ export interface UploadResponse {
 }
 
 export interface CreditBalance {
+  id: string;
+  user_id: string;
   balance: number;
   total_purchased: number;
   total_consumed: number;
+  updated_at: string;
 }
 
 export interface CreditCosts {
@@ -166,7 +180,7 @@ export interface Project {
   id: string;
   user_id: string;
   name: string;
-  description?: string;
+  description: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -174,8 +188,66 @@ export interface Project {
 export interface User {
   id: string;
   email: string;
-  name?: string;
-  avatar_url?: string;
+  name: string | null;
+  avatar_url: string | null;
+  created_at: string;
+}
+
+export interface Session {
+  id: string;
+  user_id: string;
+  token: string;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface Account {
+  id: string;
+  user_id: string;
+  type: string;
+  provider: string;
+  provider_account_id: string;
+  refresh_token: string | null;
+  access_token: string | null;
+  expires_at: number | null;
+  token_type: string | null;
+  scope: string | null;
+  id_token: string | null;
+  session_state: string | null;
+  created_at: string;
+}
+
+export interface ApiKey {
+  id: string;
+  user_id: string;
+  name: string;
+  key_hash: string;
+  last_used: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface CreditTransaction {
+  id: string;
+  user_id: string;
+  balance_id: string;
+  amount: number;
+  type: string;
+  description: string | null;
+  generation_id: string | null;
+  created_at: string;
+}
+
+export interface Upload {
+  id: string;
+  user_id: string;
+  url: string;
+  type: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+  expires_at: string;
   created_at: string;
 }
 
