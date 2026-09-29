@@ -33,12 +33,6 @@
     "api/**/*.ts": {
       "maxDuration": 30,
       "includeFiles": "prisma/**/*"
-    },
-    "api/auth/register/index.ts": {
-      "maxDuration": 30
-    },
-    "api/auth/[...nextauth]/index.ts": {
-      "maxDuration": 30
     }
   }
 }
