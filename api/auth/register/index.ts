@@ -16,9 +16,21 @@ function successResponse<T>(res: VercelResponse, data: T, requestId: string, sta
   return res.status(status).json({ data, request_id: requestId } as ApiResponse<T>);
 }
 
+function setCorsHeaders(res: VercelResponse) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const requestId = generateRequestId();
   res.setHeader("X-Request-ID", requestId);
+  setCorsHeaders(res);
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
 
   if (req.method !== "POST") {
     return errorResponse(res, "METHOD_NOT_ALLOWED", "Method not allowed", 405, requestId);

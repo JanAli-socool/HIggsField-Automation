@@ -5,6 +5,14 @@
   "installCommand": "npm ci",
   "rewrites": [
     {
+      "source": "/api/auth/register",
+      "destination": "/api/auth/register"
+    },
+    {
+      "source": "/api/auth/(.*)",
+      "destination": "/api/auth/[...nextauth]"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
