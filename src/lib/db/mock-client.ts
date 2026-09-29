@@ -14,9 +14,16 @@ import type {
   Account,
   ApiKey,
 } from "../../types/api.js";
+import crypto from "crypto";
 
 interface MockUser extends User {
   passwordHash?: string;
+  isVerified?: boolean;
+  verificationToken?: string;
+  verificationTokenExpires?: string;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: string;
+  emailVerificationFailed?: boolean;
 }
 
 const MOCK_USERS = new Map<string, MockUser>();
@@ -61,6 +68,12 @@ function createMockUser(data: { email: string; name?: string; avatar_url?: strin
     name: data.name || null,
     avatar_url: data.avatar_url || null,
     passwordHash: data.passwordHash || null,
+    isVerified: false,
+    verificationToken: crypto.randomBytes(32).toString("hex"),
+    verificationTokenExpires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    resetPasswordToken: null,
+    resetPasswordExpires: null,
+    emailVerificationFailed: false,
     created_at: now,
   };
   MOCK_USERS.set(id, user);
@@ -306,6 +319,21 @@ const mockPrisma = {
     },
     update: async (args: { where: { id: string }; data: Partial<User> }) => {
       return updateMockUser(args.where.id, args.data) || null;
+    },
+    findFirst: async (args: { where: { verificationToken?: string; verificationTokenExpires?: { gt?: Date }; resetPasswordToken?: string; resetPasswordExpires?: { gt?: Date } } }) => {
+      for (const user of MOCK_USERS.values()) {
+        if (args.where.verificationToken && user.verificationToken === args.where.verificationToken) {
+          if (!args.where.verificationTokenExpires || new Date(user.verificationTokenExpires || 0) > new Date()) {
+            return user;
+          }
+        }
+        if (args.where.resetPasswordToken && user.resetPasswordToken === args.where.resetPasswordToken) {
+          if (!args.where.resetPasswordExpires || new Date(user.resetPasswordExpires || 0) > new Date()) {
+            return user;
+          }
+        }
+      }
+      return null;
     },
   },
   session: {
