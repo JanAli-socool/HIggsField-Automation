@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { verifyEmail } from "../../../../src/lib/auth/controller";
-import { validateRequest } from "../../../../src/lib/auth/middleware";
-import { verifyEmailSchema } from "../../../../src/lib/auth/validators";
+import { verifyEmail } from "../../../../src/lib/auth/controller.js";
+import { validateRequest } from "../../../../src/lib/auth/middleware.js";
+import { verifyEmailSchema } from "../../../../src/lib/auth/validators.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {

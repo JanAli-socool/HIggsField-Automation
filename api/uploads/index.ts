@@ -3,7 +3,7 @@ import { ApiResponse, ApiError } from "../../src/types/api.js";
 import { v4 as uuidv4 } from "uuid";
 import { parseMultipartFormData } from "../../src/lib/upload/parser.js";
 import { storage, generateThumbnail, generateVideoThumbnails } from "../../src/lib/storage/index.js";
-import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/middleware.js";
+import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/apiMiddleware.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;

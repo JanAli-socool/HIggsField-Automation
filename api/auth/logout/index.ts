@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { logout } from "../../../../src/lib/auth/controller";
+import { logout } from "../../../../src/lib/auth/controller.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

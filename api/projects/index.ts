@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { Project, ApiResponse, ApiError, PaginatedResponse } from "../../src/types/api.js";
 import prisma from "../../src/lib/db/client.js";
-import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/middleware.js";
+import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/apiMiddleware.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -26,9 +26,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     switch (req.method) {
       case "POST":
-        return await handleCreate(req, res, requestId, authReq.user.id);
+        return await handleCreate(authReq, res, requestId, authReq.user.id);
       case "GET":
-        return await handleList(req, res, requestId, authReq.user.id);
+        return await handleList(authReq, res, requestId, authReq.user.id);
       default:
         return errorResponse(res, "METHOD_NOT_ALLOWED", "Method not allowed", 405, requestId);
     }
@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: string, userId: string) {
+async function handleCreate(req: AuthenticatedRequest, res: VercelResponse, requestId: string, userId: string) {
   const { name, description } = req.body as { name: string; description?: string };
 
   if (!name || name.trim().length < 1) {
@@ -63,7 +63,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, requestId: 
   }, requestId, 201);
 }
 
-async function handleList(req: VercelRequest, res: VercelResponse, requestId: string, userId: string) {
+async function handleList(req: AuthenticatedRequest, res: VercelResponse, requestId: string, userId: string) {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const pageSize = Math.min(50, Math.max(1, parseInt(req.query.page_size as string) || 20));
 

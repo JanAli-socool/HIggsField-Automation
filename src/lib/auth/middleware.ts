@@ -1,7 +1,7 @@
 import { AnyZodObject, ZodError } from "zod";
-import { CustomError } from "./errors";
+import { CustomError } from "./errors.js";
 
-export const validateRequest = (schema: AnyZodObject) =>
+export const validateRequest = (schema: any) =>
   async (req: any, res: any, next: Function): Promise<void> => {
     try {
       await schema.parseAsync({

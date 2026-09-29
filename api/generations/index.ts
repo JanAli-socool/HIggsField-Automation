@@ -3,7 +3,7 @@ import { GenerationRequest, GenerationJobListItem, PaginatedResponse, ApiRespons
 import { validateGeneration, submitGeneration, getGenerationStatus } from "../../src/lib/providers/registry.js";
 import prisma from "../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
-import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/middleware.js";
+import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/apiMiddleware.js";
 
 const PLACEHOLDER_VIDEOS = [
   "https://assets.mixkit.co/videos/preview/mixkit-clouds-moving-in-the-sky-time-lapse-1189-large.mp4",
