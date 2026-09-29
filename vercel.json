@@ -5,10 +5,6 @@
   "installCommand": "npm ci",
   "rewrites": [
     {
-      "source": "/api/auth/(.*)",
-      "destination": "/api/auth/$1"
-    },
-    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
@@ -42,6 +38,5 @@
       "maxDuration": 30,
       "includeFiles": "prisma/**/*"
     }
-  },
-  "crons": []
+  }
 }
