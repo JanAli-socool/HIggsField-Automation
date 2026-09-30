@@ -141,7 +141,7 @@ const loginHandler = catchAsync(async (req: any, res: any) => {
 });
 
 const verifyEmailHandler = catchAsync(async (req: any, res: any) => {
-  const { token } = req.params;
+  const { token } = req.body;
 
   const user = await prisma.user.findFirst({
     where: {
@@ -203,8 +203,7 @@ const forgotPasswordHandler = catchAsync(async (req: any, res: any) => {
 });
 
 const resetPasswordHandler = catchAsync(async (req: any, res: any) => {
-  const { token } = req.params;
-  const { password } = req.body as { password: string };
+  const { token, password } = req.body as { token: string; password: string };
 
   const user = await prisma.user.findFirst({
     where: {
@@ -266,9 +265,11 @@ const logoutHandler = catchAsync(async (req: any, res: any) => {
 });
 
 export const signup = signupHandler;
+export const register = signupHandler;
 export const login = loginHandler;
 export const verifyEmail = verifyEmailHandler;
 export const forgotPassword = forgotPasswordHandler;
 export const resetPassword = resetPasswordHandler;
 export const getMe = getMeHandler;
+export const me = getMeHandler;
 export const logout = logoutHandler;
