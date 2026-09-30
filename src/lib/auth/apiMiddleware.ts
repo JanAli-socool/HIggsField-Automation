@@ -1,4 +1,4 @@
-import { VercelRequest, VercelResponse } from "@vercel/node";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { protect } from "./authMiddleware.js";
 
 export function withAuth(req: VercelRequest, res: VercelResponse): Promise<any> {

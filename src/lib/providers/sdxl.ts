@@ -126,20 +126,34 @@ export class SDXLProvider extends BaseProvider implements GenerationProvider {
     const jobId = `sdxl_${response.id}`;
     const now = new Date().toISOString();
 
-    return {
+    const job: GenerationJob = {
       id: jobId,
       user_id: "current_user",
       project_id: request.project_id || null,
+      media_type: parameters.media_type,
+      model: parameters.model,
+      original_prompt: parameters.prompt,
+      enhanced_prompt: parameters.prompt,
+      negative_prompt: parameters.negative_prompt || "",
       status: "queued",
       progress: 0,
-      request,
-      result_urls: [],
+      input_asset_url: parameters.input_image_url || null,
+      mask_url: parameters.mask_url || null,
+      first_frame_image_url: parameters.first_frame_image_url || null,
+      last_frame_image_url: parameters.last_frame_image_url || null,
+      output_asset_urls: [],
       thumbnail_urls: [],
+      parameters,
+      provider_job_id: response.id,
       credit_cost: validation.estimated_credits,
+      error_message: null,
+      failure_type: null,
       created_at: now,
       updated_at: now,
-      provider_job_id: response.id,
+      completed_at: null,
     };
+
+    return job;
   }
 
   async getStatus(jobId: string): Promise<{ status: JobStatus; progress: number; resultUrls?: string[]; error?: string; failureType?: FailureType }> {
@@ -185,19 +199,33 @@ export class SDXLProvider extends BaseProvider implements GenerationProvider {
     const providerJobId = jobId.replace("sdxl_", "");
     const response = await this.makeRequest<SDXLGenerateResponse>(`/predictions/${providerJobId}/retry`, { method: "POST" });
 
+    const now = new Date().toISOString();
+
     return {
       id: `sdxl_${response.id}`,
       user_id: "current_user",
       project_id: null,
+      media_type: "image",
+      model: "sdxl",
+      original_prompt: "",
+      enhanced_prompt: "",
+      negative_prompt: "",
       status: "queued",
       progress: 0,
-      request: { parameters: {} } as any,
-      result_urls: [],
+      input_asset_url: null,
+      mask_url: null,
+      first_frame_image_url: null,
+      last_frame_image_url: null,
+      output_asset_urls: [],
       thumbnail_urls: [],
-      credit_cost: 2,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      parameters: {} as GenerationParameters,
       provider_job_id: response.id,
+      credit_cost: 2,
+      error_message: null,
+      failure_type: null,
+      created_at: now,
+      updated_at: now,
+      completed_at: null,
     };
   }
 }

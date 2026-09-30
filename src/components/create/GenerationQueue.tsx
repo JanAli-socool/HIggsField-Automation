@@ -17,8 +17,8 @@ const statusConfig: Record<string, { icon: any; color: string; label: string }> 
 
 function ResultViewer({ job, onClose }: { job: GenerationJob; onClose: () => void }) {
   const downloadVideo = () => {
-    if (!job.resultUrl && !job.resultUrls?.length) return;
-    const url = job.resultUrl || job.resultUrls?.[0];
+    if (!job.output_asset_urls?.length) return;
+    const url = job.output_asset_urls[0];
     if (!url) return;
     const link = document.createElement("a");
     link.href = url;
@@ -32,14 +32,14 @@ function ResultViewer({ job, onClose }: { job: GenerationJob; onClose: () => voi
     <Drawer
       isOpen={true}
       onClose={onClose}
-      title={`Generated: ${job.request?.prompt?.slice(0, 50) || "Video"}...`}
+      title={`Generated: ${job.original_prompt?.slice(0, 50) || "Video"}...`}
       side="right"
       size="lg"
     >
       <div className="space-y-4">
         <div className="relative aspect-video rounded-xl overflow-hidden bg-surface">
           <VideoPlayer
-            src={job.resultUrl || job.resultUrls?.[0] || "/videos/result.webm"}
+            src={job.output_asset_urls?.[0] || "/videos/result.webm"}
             fallback="/videos/result.webm"
             className="w-full h-full object-cover"
             autoPlay
@@ -63,23 +63,23 @@ function ResultViewer({ job, onClose }: { job: GenerationJob; onClose: () => voi
         <div className="space-y-3 text-sm">
           <div className="flex justify-between text-text-muted">
             <span>Mode</span>
-            <span className="text-text-primary capitalize">{job.request?.mode || "unknown"}</span>
+            <span className="text-text-primary capitalize">{job.media_type || "unknown"}</span>
           </div>
           <div className="flex justify-between text-text-muted">
             <span>Model</span>
-            <span className="text-text-primary">{job.request?.modelId || "unknown"}</span>
+            <span className="text-text-primary">{job.model || "unknown"}</span>
           </div>
           <div className="flex justify-between text-text-muted">
             <span>Resolution</span>
-            <span className="text-text-primary">{job.request?.resolution || "unknown"}</span>
+            <span className="text-text-primary">{job.parameters?.width}x{job.parameters?.height || "unknown"}</span>
           </div>
           <div className="flex justify-between text-text-muted">
             <span>Aspect Ratio</span>
-            <span className="text-text-primary">{job.request?.aspectRatio || "unknown"}</span>
+            <span className="text-text-primary">{job.parameters?.aspect_ratio || "unknown"}</span>
           </div>
           <div className="flex justify-between text-text-muted">
             <span>Duration</span>
-            <span className="text-text-primary">~5s (simulated)</span>
+            <span className="text-text-primary">~{job.parameters?.duration_seconds || 5}s</span>
           </div>
           <div className="pt-3 border-t border-border text-text-muted">
             <p>This is a simulated generation. In production, this would be your AI-generated video.</p>
@@ -120,7 +120,7 @@ export function GenerationQueue({ queue, onRemove }: { queue: GenerationJob[]; o
                   "bg-surface border rounded-xl p-4 shadow-elevated flex items-start gap-3",
                   job.status === "completed" && "border-emerald-500/50",
                   job.status === "failed" && "border-red-500/50",
-                  job.status === "processing" && "border-blue-500/50",
+                  job.status === "generating" && "border-blue-500/50",
                   job.status === "cancelled" && "border-gray-500/50"
                 )}
               >
@@ -130,7 +130,7 @@ export function GenerationQueue({ queue, onRemove }: { queue: GenerationJob[]; o
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-text-primary truncate">
-                      {job.request?.mode === "template" ? "Template" : "Prompt"} Generation
+                      {job.media_type === "image_to_video" ? "Template" : "Prompt"} Generation
                     </span>
                     <button
                       onClick={() => onRemove(job.id)}
@@ -140,10 +140,10 @@ export function GenerationQueue({ queue, onRemove }: { queue: GenerationJob[]; o
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  <p className="text-xs text-text-secondary mt-1 truncate">{job.request?.prompt?.slice(0, 80) || ""}...</p>
+                  <p className="text-xs text-text-secondary mt-1 truncate">{job.original_prompt?.slice(0, 80) || ""}...</p>
                   <div className="flex items-center gap-3 mt-2">
                     <span className={cn("text-xs font-medium", config.color)}>{config.label}</span>
-                    {job.status === "processing" && (
+                    {job.status === "generating" && (
                       <div className="flex-1 h-1.5 bg-border rounded-full overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
@@ -153,14 +153,14 @@ export function GenerationQueue({ queue, onRemove }: { queue: GenerationJob[]; o
                       </div>
                     )}
                   </div>
-                  {job.status === "completed" && (job.resultUrl || job.resultUrls?.length) && (
+                  {job.status === "completed" && job.output_asset_urls?.length && (
                     <div className="flex gap-2 mt-3">
                       <Button variant="ghost" size="sm" onClick={() => setViewJob(job)} className="gap-1.5">
                         <Eye className="w-3.5 h-3.5" />
                         View
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => {
-                        const url = job.resultUrl || job.resultUrls?.[0];
+                        const url = job.output_asset_urls[0];
                         if (url) {
                           const link = document.createElement("a");
                           link.href = url;

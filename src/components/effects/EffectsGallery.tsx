@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { effects, categories } from "../../data/effects";
-import type { Category } from "../../types";
+import type { CategoryItem } from "../../types";
 import { CategoryFilter } from "./CategoryFilter";
 import { EffectCard } from "./EffectCard";
 import { EffectDetailDrawer } from "./EffectDetailDrawer";
@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 
 export function EffectsGallery() {
-  const [activeCategory, setActiveCategory] = useState<Category>("all");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
   const [selectedEffect, setSelectedEffect] = useState<typeof effects[0] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -36,7 +36,7 @@ export function EffectsGallery() {
 
         <CategoryFilter
           activeCategory={activeCategory}
-          onCategoryChange={(cat: string) => setActiveCategory(cat as Category)}
+          onCategoryChange={(cat: string) => setActiveCategory(cat)}
         />
 
         <motion.div

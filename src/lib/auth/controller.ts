@@ -1,10 +1,10 @@
 import bcrypt from "bcryptjs";
-import { generateToken } from "./jwt";
-import { config } from "./config";
-import { CustomError, catchAsync } from "./errors";
-import { AuthRequest } from "./types";
+import { generateToken } from "./jwt.js";
+import { config } from "./config.js";
+import { CustomError, catchAsync } from "./errors.js";
+import { AuthRequest } from "./types.js";
 import crypto from "crypto";
-import prisma from "../db/client";
+import prisma from "../db/client.js";
 
 const sendVerificationEmail = async (email: string, name: string, token: string): Promise<void> => {
   const verificationUrl = `${config.app.url}/auth/verify-email/${token}`;

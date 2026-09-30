@@ -164,7 +164,6 @@ export class MockProvider extends BaseProvider implements GenerationProvider {
       output_asset_urls: resultUrls,
       thumbnail_urls: thumbnailUrls,
       parameters: params,
-      request,
       provider_job_id: jobId,
       credit_cost: validation.estimated_credits,
       error_message: null,
@@ -216,7 +215,7 @@ export class MockProvider extends BaseProvider implements GenerationProvider {
     await updateStatus("encoding", 95);
     await updateStatus("uploading", 98);
 
-    await updateStatus("completed", 100, params.num_outputs > 0 
+    await updateStatus("completed", 100, params.num_outputs > 0
       ? Array.from({ length: params.num_outputs }, (_, i) => getPlaceholderUrl(params.media_type, i))
       : []);
   }
@@ -322,16 +321,27 @@ export class MockProvider extends BaseProvider implements GenerationProvider {
       id: newJob.id,
       user_id: newJob.user_id,
       project_id: newJob.project_id,
+      media_type: newJob.media_type,
+      model: newJob.model,
+      original_prompt: newJob.original_prompt,
+      enhanced_prompt: newJob.enhanced_prompt,
+      negative_prompt: newJob.negative_prompt,
       status: newJob.status as JobStatus,
       progress: newJob.progress,
-      request: originalJob.parameters as any,
-      result_urls: resultUrls,
-      thumbnail_urls: thumbnailUrls,
-      credit_cost: newJob.credit_cost,
-      created_at: newJob.created_at,
-      updated_at: newJob.update_at,
-      completed_at: newJob.completed_at,
+      input_asset_url: newJob.input_asset_url,
+      mask_url: newJob.mask_url,
+      first_frame_image_url: newJob.first_frame_image_url,
+      last_frame_image_url: newJob.last_frame_image_url,
+      output_asset_urls: newJob.output_asset_urls,
+      thumbnail_urls: newJob.thumbnail_urls,
+      parameters: newJob.parameters,
       provider_job_id: newJob.provider_job_id,
+      credit_cost: newJob.credit_cost,
+      error_message: newJob.error_message,
+      failure_type: newJob.failure_type,
+      created_at: newJob.created_at,
+      updated_at: newJob.updated_at,
+      completed_at: newJob.completed_at,
     }
   }
 }

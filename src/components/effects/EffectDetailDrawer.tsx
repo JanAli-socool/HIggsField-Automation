@@ -1,4 +1,4 @@
-import type { Effect, GenerationJob } from "../../types";
+import type { Effect, GenerationJob, GenerationParameters } from "../../types";
 import { Badge } from "../ui/Badge";
 import { VideoPlayer } from "../ui/VideoPlayer";
 import { Button } from "../ui/Button";
@@ -12,6 +12,26 @@ interface EffectDetailDrawerProps {
   effect: Effect | null;
   isOpen: boolean;
   onClose: () => void;
+}
+
+function buildParamsFromEffect(effect: Effect): GenerationParameters {
+  return {
+    media_type: "image_to_video",
+    model: effect.model.toLowerCase().replace(/\s+/g, "-") as any,
+    prompt: effect.prompt,
+    negative_prompt: "",
+    width: 576,
+    height: 1024,
+    aspect_ratio: "9:16",
+    num_outputs: 1,
+    steps: 28,
+    guidance_scale: 5,
+    quality: "standard",
+    duration_seconds: 5,
+    fps: 24,
+    motion_strength: 0.6,
+    camera_motion: "none",
+  };
 }
 
 export function EffectDetailDrawer({ effect, isOpen, onClose }: EffectDetailDrawerProps) {
@@ -44,41 +64,49 @@ export function EffectDetailDrawer({ effect, isOpen, onClose }: EffectDetailDraw
     
     setIsGeneratingEffect(true);
     const jobId = `gen-${Date.now()}`;
+    const params = buildParamsFromEffect(effect);
     
     addToQueue({
       id: jobId,
-      request: {
-        mode: "template",
-        prompt: effect.prompt,
-        modelId: effect.model.toLowerCase().replace(/\s+/g, "-"),
-        effectId: effect.id,
-        assets: {
-          character: { type: "character", file: null, preview: null, url: null },
-          location: { type: "location", file: null, preview: null, url: null },
-          product: { type: "product", file: null, preview: null, url: null },
-        },
-        resolution: effect.resolution.toLowerCase() as any,
-        aspectRatio: "9:16",
-      },
+      user_id: "current_user",
+      project_id: null,
+      media_type: params.media_type,
+      model: params.model,
+      original_prompt: effect.prompt,
+      enhanced_prompt: "",
+      negative_prompt: "",
       status: "queued",
       progress: 0,
-      createdAt: new Date().toISOString(),
+      input_asset_url: null,
+      mask_url: null,
+      first_frame_image_url: null,
+      last_frame_image_url: null,
+      output_asset_urls: [],
+      thumbnail_urls: [],
+      parameters: params,
+      provider_job_id: null,
+      credit_cost: 0,
+      error_message: null,
+      failure_type: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      completed_at: null,
     });
 
     // Simulate generation
     setTimeout(() => {
-      useCreateStore.getState().updateJob(jobId, { status: "processing", progress: 10 });
+      useCreateStore.getState().updateJob(jobId, { status: "generating", progress: 10 });
       const interval = setInterval(() => {
         const state = useCreateStore.getState();
         const job = state.queue.find((j: GenerationJob) => j.id === jobId);
-        if (!job || job.status !== "processing") {
+        if (!job || job.status !== "generating") {
           clearInterval(interval);
           setIsGeneratingEffect(false);
           return;
         }
         if (job.progress >= 90) {
           clearInterval(interval);
-          state.updateJob(jobId, { status: "completed", progress: 100, resultUrl: "/videos/result.webm" });
+          state.updateJob(jobId, { status: "completed", progress: 100, output_asset_urls: ["/videos/result.webm"] });
           setIsGeneratingEffect(false);
         } else {
           state.updateJob(jobId, { progress: job.progress + Math.random() * 15 });

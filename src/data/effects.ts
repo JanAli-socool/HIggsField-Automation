@@ -1,6 +1,5 @@
-import type { Effect, CategoryItem } from "../types";
+import type { Effect, CategoryItem } from "@/types";
 
-// Generate unique placeholder SVGs for each effect
 const createPlaceholder = (hue: number, label: string) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 225" fill="none">
     <rect width="400" height="225" fill="hsl(${hue}, 30%, 15%)"/>

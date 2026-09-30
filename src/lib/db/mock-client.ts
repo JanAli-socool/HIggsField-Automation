@@ -7,12 +7,7 @@ import type {
   FailureType,
   Project,
   CreditBalance,
-  CreditTransaction,
-  Upload,
   User,
-  Session,
-  Account,
-  ApiKey,
 } from "../../types/api.js";
 import crypto from "crypto";
 
@@ -26,15 +21,72 @@ interface MockUser extends User {
   emailVerificationFailed?: boolean;
 }
 
+interface MockSession {
+  id: string;
+  user_id: string;
+  token: string;
+  expires_at: string;
+  created_at: string;
+}
+
+interface MockAccount {
+  id: string;
+  user_id: string;
+  provider: string;
+  provider_account_id: string;
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: string;
+  token_type?: string;
+  scope?: string;
+  id_token?: string;
+  created_at: string;
+}
+
+interface MockCreditTransaction {
+  id: string;
+  user_id: string;
+  balance_id: string;
+  amount: number;
+  type: "purchase" | "consumption" | "refund" | "bonus";
+  description: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+}
+
+interface MockUpload {
+  id: string;
+  user_id: string;
+  url: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  width?: number;
+  height?: number;
+  thumbnails: string[];
+  expires_at: string;
+  created_at: string;
+}
+
+interface MockApiKey {
+  id: string;
+  user_id: string;
+  name: string;
+  key_hash: string;
+  last_used: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
 const MOCK_USERS = new Map<string, MockUser>();
-const MOCK_SESSIONS = new Map<string, Session>();
-const MOCK_ACCOUNTS = new Map<string, Account>();
+const MOCK_SESSIONS = new Map<string, MockSession>();
+const MOCK_ACCOUNTS = new Map<string, MockAccount>();
 const MOCK_PROJECTS = new Map<string, Project>();
 const MOCK_GENERATIONS = new Map<string, GenerationJob>();
 const MOCK_CREDIT_BALANCES = new Map<string, CreditBalance>();
-const MOCK_CREDIT_TRANSACTIONS = new Map<string, CreditTransaction[]>();
-const MOCK_UPLOADS = new Map<string, Upload>();
-const MOCK_API_KEYS = new Map<string, ApiKey>();
+const MOCK_CREDIT_TRANSACTIONS = new Map<string, MockCreditTransaction[]>();
+const MOCK_UPLOADS = new Map<string, MockUpload>();
+const MOCK_API_KEYS = new Map<string, MockApiKey>();
 
 function generateId(prefix = "mock"): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -79,12 +131,9 @@ function createMockUser(data: { email: string; name?: string; avatar_url?: strin
   MOCK_USERS.set(id, user);
   
   const balance: CreditBalance = {
-    id: generateCuid(),
-    user_id: id,
     balance: 1000,
     total_purchased: 1000,
     total_consumed: 0,
-    updated_at: now,
   };
   MOCK_CREDIT_BALANCES.set(id, balance);
   MOCK_CREDIT_TRANSACTIONS.set(id, []);
@@ -100,9 +149,9 @@ function updateMockUser(id: string, data: Partial<User>): User | undefined {
   return updated;
 }
 
-function createMockSession(userId: string): Session {
+function createMockSession(userId: string): MockSession {
   const token = generateId("session");
-  const session: Session = {
+  const session: MockSession = {
     id: generateCuid(),
     user_id: userId,
     token,
@@ -113,7 +162,7 @@ function createMockSession(userId: string): Session {
   return session;
 }
 
-function getMockSession(token: string): Session | undefined {
+function getMockSession(token: string): MockSession | undefined {
   return MOCK_SESSIONS.get(token);
 }
 
@@ -129,8 +178,8 @@ function deleteMockSessionsByUserId(userId: string): void {
   }
 }
 
-function createMockAccount(data: Omit<Account, "id" | "created_at">): Account {
-  const account: Account = {
+function createMockAccount(data: Omit<MockAccount, "id" | "created_at">): MockAccount {
+  const account: MockAccount = {
     ...data,
     id: generateCuid(),
     created_at: nowISO(),
@@ -140,11 +189,11 @@ function createMockAccount(data: Omit<Account, "id" | "created_at">): Account {
   return account;
 }
 
-function getMockAccount(provider: string, providerAccountId: string): Account | undefined {
+function getMockAccount(provider: string, providerAccountId: string): MockAccount | undefined {
   return MOCK_ACCOUNTS.get(`${provider}:${providerAccountId}`);
 }
 
-function linkMockAccount(userId: string, account: Omit<Account, "id" | "user_id" | "created_at">): Account {
+function linkMockAccount(userId: string, account: Omit<MockAccount, "id" | "user_id" | "created_at">): MockAccount {
   return createMockAccount({ ...account, user_id: userId });
 }
 
@@ -218,14 +267,10 @@ function updateMockGeneration(id: string, data: Partial<GenerationJob>): Generat
 function getMockCreditBalance(userId: string): CreditBalance {
   let balance = MOCK_CREDIT_BALANCES.get(userId);
   if (!balance) {
-    const now = nowISO();
     balance = {
-      id: generateCuid(),
-      user_id: userId,
       balance: 1000,
       total_purchased: 1000,
       total_consumed: 0,
-      updated_at: now,
     };
     MOCK_CREDIT_BALANCES.set(userId, balance);
     MOCK_CREDIT_TRANSACTIONS.set(userId, []);
@@ -235,17 +280,16 @@ function getMockCreditBalance(userId: string): CreditBalance {
 
 function updateMockCreditBalance(userId: string, data: Partial<CreditBalance>): CreditBalance {
   const balance = getMockCreditBalance(userId);
-  const updated = { ...balance, ...data, updated_at: nowISO() };
+  const updated = { ...balance, ...data };
   MOCK_CREDIT_BALANCES.set(userId, updated);
   return updated;
 }
 
-function createMockCreditTransaction(userId: string, data: Omit<CreditTransaction, "id" | "created_at" | "balance_id">): CreditTransaction {
-  const balance = getMockCreditBalance(userId);
-  const transaction: CreditTransaction = {
+function createMockCreditTransaction(userId: string, data: Omit<MockCreditTransaction, "id" | "created_at" | "balance_id">): MockCreditTransaction {
+  const transaction: MockCreditTransaction = {
     id: generateCuid(),
     user_id: userId,
-    balance_id: balance.id,
+    balance_id: userId,
     ...data,
     created_at: nowISO(),
   };
@@ -255,12 +299,12 @@ function createMockCreditTransaction(userId: string, data: Omit<CreditTransactio
   return transaction;
 }
 
-function getMockCreditTransactions(userId: string): CreditTransaction[] {
+function getMockCreditTransactions(userId: string): MockCreditTransaction[] {
   return MOCK_CREDIT_TRANSACTIONS.get(userId) || [];
 }
 
-function createMockUpload(userId: string, data: Omit<Upload, "id" | "created_at">): Upload {
-  const upload: Upload = {
+function createMockUpload(userId: string, data: Omit<MockUpload, "id" | "created_at">): MockUpload {
+  const upload: MockUpload = {
     id: generateCuid(),
     user_id: userId,
     ...data,
@@ -270,10 +314,10 @@ function createMockUpload(userId: string, data: Omit<Upload, "id" | "created_at"
   return upload;
 }
 
-function createMockApiKey(userId: string, name: string): { apiKey: ApiKey; plainKey: string } {
+function createMockApiKey(userId: string, name: string): { apiKey: MockApiKey; plainKey: string } {
   const plainKey = `hf_${generateId("key")}`;
   const keyHash = plainKey;
-  const apiKey: ApiKey = {
+  const apiKey: MockApiKey = {
     id: generateCuid(),
     user_id: userId,
     name,
@@ -286,7 +330,7 @@ function createMockApiKey(userId: string, name: string): { apiKey: ApiKey; plain
   return { apiKey, plainKey };
 }
 
-function getMockApiKey(keyHash: string): ApiKey | undefined {
+function getMockApiKey(keyHash: string): MockApiKey | undefined {
   return MOCK_API_KEYS.get(keyHash);
 }
 
@@ -352,7 +396,7 @@ const mockPrisma = {
     findUnique: async (args: { where: { provider_provider_account_id: { provider: string; provider_account_id: string } } }) => {
       return getMockAccount(args.where.provider_provider_account_id.provider, args.where.provider_provider_account_id.provider_account_id) || null;
     },
-    create: async (args: { data: Omit<Account, "id" | "created_at"> }) => {
+    create: async (args: { data: Omit<MockAccount, "id" | "created_at"> }) => {
       return createMockAccount(args.data);
     },
   },
@@ -416,7 +460,7 @@ const mockPrisma = {
     },
   },
   creditTransaction: {
-    create: async (args: { data: Omit<CreditTransaction, "id" | "created_at" | "balance_id"> & { user_id: string } }) => {
+    create: async (args: { data: Omit<MockCreditTransaction, "id" | "created_at" | "balance_id"> & { user_id: string } }) => {
       return createMockCreditTransaction(args.data.user_id, args.data);
     },
     findMany: async (args: { where: { user_id: string }; orderBy?: any; skip?: number; take?: number }) => {
@@ -430,7 +474,7 @@ const mockPrisma = {
     },
   },
   upload: {
-    create: async (args: { data: Omit<Upload, "id" | "created_at"> }) => {
+    create: async (args: { data: Omit<MockUpload, "id" | "created_at"> }) => {
       return createMockUpload(args.data.user_id, args.data);
     },
   },

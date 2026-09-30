@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { login } from "../../../../src/lib/auth/controller.js";
-import { validateRequest } from "../../../../src/lib/auth/middleware.js";
-import { loginSchema } from "../../../../src/lib/auth/validators.js";
+import { login } from "@/lib/auth/controller.js";
+import { validateRequest } from "@/lib/auth/middleware.js";
+import { loginSchema } from "@/lib/auth/validators.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ApiResponse, ApiError } from "../../src/types/api.js";
+import { ApiResponse, ApiError } from "@/types/api.js";
 import bcrypt from "bcryptjs";
-import prisma from "../../src/lib/db/client.js";
+import prisma from "@/lib/db/client.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;

@@ -1,7 +1,7 @@
-import { verifyToken } from "./jwt";
-import { CustomError, catchAsync } from "./errors";
-import { AuthRequest } from "./types";
-import prisma from "../db/client";
+import { verifyToken } from "./jwt.js";
+import { CustomError, catchAsync } from "./errors.js";
+import { AuthRequest } from "./types.js";
+import prisma from "../db/client.js";
 
 export const protect = catchAsync(async (req: AuthRequest, res: any, next: () => void) => {
   let token: string | undefined;

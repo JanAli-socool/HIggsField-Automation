@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { GenerationRequest, GenerationJob, Asset, EnhancePromptResponse, WorkflowSelectResponse } from "../types";
-import { api, ApiError } from "../lib/api/client";
+import type { GenerationRequest, GenerationJob, Asset, EnhancePromptResponse, WorkflowSelectResponse } from "@/types";
+import { api, ApiError } from "@/lib/api/client";
 
 interface CreateState {
   activeTab: "prompt" | "template";
@@ -24,6 +24,7 @@ interface CreateState {
   motionStrength: number;
   cameraMotion: string;
   numOutputs: number;
+  projectId: string | undefined;
   queue: GenerationJob[];
   isGenerating: boolean;
   error: string | null;
@@ -69,28 +70,41 @@ interface CreateState {
   clearEnhancement: () => void;
 }
 
-const initialAssets = {
-  character: { type: "character" as const, file: null, preview: null, url: null },
-  location: { type: "location" as const, file: null, preview: null, url: null },
-  product: { type: "product" as const, file: null, preview: null, url: null },
-};
-
-const defaultParams = {
-  modelId: "wan21",
-  resolution: "1080p" as const,
-  aspectRatio: "16:9" as const,
-  quality: "standard" as const,
-  steps: 28,
-  guidanceScale: 5,
-  seed: null as number | null,
-  strength: 0.75,
-  durationSeconds: 5,
-  fps: 24,
-  motionStrength: 0.6,
-  cameraMotion: "none",
-  numOutputs: 1,
-  debounceTimer: null as ReturnType<typeof setTimeout> | null,
-};
+function getInitialState() {
+  return {
+    modelId: "wan21",
+    resolution: "1080p" as const,
+    aspectRatio: "16:9" as const,
+    quality: "standard" as const,
+    steps: 28,
+    guidanceScale: 5,
+    seed: null as number | null,
+    strength: 0.75,
+    durationSeconds: 5,
+    fps: 24,
+    motionStrength: 0.6,
+    cameraMotion: "none",
+    numOutputs: 1,
+    projectId: undefined,
+    debounceTimer: null as ReturnType<typeof setTimeout> | null,
+    activeTab: "prompt" as const,
+    selectedEffectId: null,
+    prompt: "",
+    assets: {
+      character: { type: "character" as const, file: null, preview: null, url: null },
+      location: { type: "location" as const, file: null, preview: null, url: null },
+      product: { type: "product" as const, file: null, preview: null, url: null },
+    },
+    queue: [] as GenerationJob[],
+    isGenerating: false,
+    error: null,
+    isPolling: false,
+    enhancedPrompt: null,
+    workflowRecommendation: null,
+    isEnhancing: false,
+    isDetectingWorkflow: false,
+  };
+}
 
 function resolutionToDimensions(resolution: string, aspectRatio: string): { width: number; height: number } {
   const ratios: Record<string, [number, number]> = {
@@ -153,87 +167,114 @@ function buildParameters(
   return baseParams;
 }
 
-const storeCreator = (set: any, get: any) => ({
-  ...defaultParams,
-  activeTab: "prompt",
-  selectedEffectId: null,
-  prompt: "",
-  assets: {
-    character: { type: "character" as const, file: null, preview: null, url: null },
-    location: { type: "location" as const, file: null, preview: null, url: null },
-    product: { type: "product" as const, file: null, preview: null, url: null },
-  },
-  queue: [],
-  isGenerating: false,
-  error: null,
-  isPolling: false,
+function createSlice(set: any, get: any) {
+  const initial = getInitialState();
 
-  enhancedPrompt: null,
-  workflowRecommendation: null,
-  isEnhancing: false,
-  isDetectingWorkflow: false,
+  function setActiveTab(tab: "prompt" | "template") {
+    set({ activeTab: tab });
+  }
 
-  setActiveTab: (tab: "prompt" | "template") => set({ activeTab: tab }),
-  setSelectedEffectId: (id: string | null) => set({ selectedEffectId: id, activeTab: "template" }),
-  setPrompt: (prompt: string) => {
+  function setSelectedEffectId(id: string | null) {
+    set({ selectedEffectId: id, activeTab: "template" });
+  }
+
+  function setPrompt(prompt: string) {
     set({ prompt });
     get().debouncedDetectWorkflow();
-  },
-  setModelId: (modelId: string) => set({ modelId }),
-  setAsset: (type: "character" | "location" | "product", asset: Partial<any>) =>
+  }
+
+  function setModelId(modelId: string) {
+    set({ modelId });
+  }
+
+  function setAsset(type: "character" | "location" | "product", asset: any) {
     set((state: any) => ({
       assets: { ...state.assets, [type]: { ...state.assets[type], ...asset } },
-    })),
-  setResolution: (resolution: "720p" | "1080p" | "4k") => set({ resolution }),
-  setAspectRatio: (aspectRatio: "16:9" | "9:16" | "1:1") => set({ aspectRatio }),
-  setQuality: (quality: "preview" | "standard" | "high") => set({ quality }),
-  setSteps: (steps: number) => set({ steps }),
-  setGuidanceScale: (guidanceScale: number) => set({ guidanceScale }),
-  setSeed: (seed: number | null) => set({ seed }),
-  setStrength: (strength: number) => set({ strength }),
-  setDurationSeconds: (durationSeconds: number) => set({ durationSeconds }),
-  setFps: (fps: number) => set({ fps }),
-  setMotionStrength: (motionStrength: number) => set({ motionStrength }),
-  setCameraMotion: (cameraMotion: string) => set({ cameraMotion }),
-  setNumOutputs: (numOutputs: number) => set({ numOutputs }),
-  setError: (error: string | null) => set({ error }),
+    }));
+  }
 
-  addToQueue: (job: GenerationJob) =>
+  function setResolution(resolution: "720p" | "1080p" | "4k") {
+    set({ resolution });
+  }
+
+  function setAspectRatio(aspectRatio: "16:9" | "9:16" | "1:1") {
+    set({ aspectRatio });
+  }
+
+  function setQuality(quality: "preview" | "standard" | "high") {
+    set({ quality });
+  }
+
+  function setSteps(steps: number) {
+    set({ steps });
+  }
+
+  function setGuidanceScale(guidanceScale: number) {
+    set({ guidanceScale });
+  }
+
+  function setSeed(seed: number | null) {
+    set({ seed });
+  }
+
+  function setStrength(strength: number) {
+    set({ strength });
+  }
+
+  function setDurationSeconds(durationSeconds: number) {
+    set({ durationSeconds });
+  }
+
+  function setFps(fps: number) {
+    set({ fps });
+  }
+
+  function setMotionStrength(motionStrength: number) {
+    set({ motionStrength });
+  }
+
+  function setCameraMotion(cameraMotion: string) {
+    set({ cameraMotion });
+  }
+
+  function setNumOutputs(numOutputs: number) {
+    set({ numOutputs });
+  }
+
+  function setError(error: string | null) {
+    set({ error });
+  }
+
+  function addToQueue(job: any) {
     set((state: any) => ({
       queue: [job, ...state.queue],
       isGenerating: true,
-    })),
+    }));
+  }
 
-  updateJob: (id: string, updates: Partial<GenerationJob>) =>
+  function updateJob(id: string, updates: Partial<any>) {
     set((state: any) => ({
-      queue: state.queue.map((j: GenerationJob) => (j.id === id ? { ...j, ...updates } : j)),
-      isGenerating: state.queue.some((j: GenerationJob) => j.id !== id && ["queued", "processing"].includes(j.status)),
-    })),
+      queue: state.queue.map((j: any) => (j.id === id ? { ...j, ...updates } : j)),
+      isGenerating: state.queue.some((j: any) => j.id !== id && ["queued", "processing"].includes(j.status)),
+    }));
+  }
 
-  removeFromQueue: (id: string) =>
+  function removeFromQueue(id: string) {
     set((state: any) => ({
-      queue: state.queue.filter((j: GenerationJob) => j.id !== id),
-      isGenerating: state.queue.some((j: GenerationJob) => j.id !== id && ["queued", "processing"].includes(j.status)),
-    })),
+      queue: state.queue.filter((j: any) => j.id !== id),
+      isGenerating: state.queue.some((j: any) => j.id !== id && ["queued", "processing"].includes(j.status)),
+    }));
+  }
 
-  clearQueue: () => set({ queue: [], isGenerating: false }),
+  function clearQueue() {
+    set({ queue: [], isGenerating: false });
+  }
 
-  resetForm: () =>
-    set({
-      prompt: "",
-      selectedEffectId: null,
-      assets: {
-        character: { type: "character" as const, file: null, preview: null, url: null },
-        location: { type: "location" as const, file: null, preview: null, url: null },
-        product: { type: "product" as const, file: null, preview: null, url: null },
-      },
-      error: null,
-      enhancedPrompt: null,
-      workflowRecommendation: null,
-      ...defaultParams,
-    }),
+  function resetForm() {
+    set(getInitialState());
+  }
 
-  uploadAsset: async (type: "character" | "location" | "product", file: File) => {
+  async function uploadAsset(type: "character" | "location" | "product", file: File) {
     try {
       const response = await api.uploads.create(file, "image");
       set((state: any) => ({
@@ -247,9 +288,9 @@ const storeCreator = (set: any, get: any) => ({
       console.error("Upload failed:", error);
       throw error;
     }
-  },
+  }
 
-  generate: async (mode: "prompt" | "template", effectId?: string) => {
+  async function generate(mode: "prompt" | "template", effectId?: string) {
     const state = get();
     if (mode === "prompt" && !state.prompt.trim()) {
       set({ error: "Please enter a prompt" });
@@ -261,28 +302,37 @@ const storeCreator = (set: any, get: any) => ({
     try {
       const parameters = buildParameters(mode, state, effectId);
       const request: GenerationRequest = {
-        mode,
-        prompt: state.prompt,
-        modelId: state.modelId,
-        assets: state.assets,
-        resolution: state.resolution,
-        aspectRatio: state.aspectRatio,
+        project_id: state.projectId,
         parameters,
-        projectId: undefined,
       };
 
       const response = await api.generations.create(request);
 
       const newJob: GenerationJob = {
         id: response.id,
-        userId: "current_user",
-        projectId: undefined,
+        user_id: "current_user",
+        project_id: state.projectId,
+        media_type: parameters.media_type,
+        model: parameters.model,
+        original_prompt: state.prompt,
+        enhanced_prompt: "",
+        negative_prompt: "",
         status: "queued",
         progress: 0,
-        request,
-        resultUrls: [],
-        thumbnailUrls: [],
-        createdAt: new Date().toISOString(),
+        input_asset_url: state.assets.character.url || null,
+        mask_url: null,
+        first_frame_image_url: state.assets.location.url || null,
+        last_frame_image_url: state.assets.product.url || null,
+        output_asset_urls: [],
+        thumbnail_urls: [],
+        parameters,
+        provider_job_id: null,
+        credit_cost: 0,
+        error_message: null,
+        failure_type: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        completed_at: null,
       };
 
       set((state: any) => ({
@@ -299,50 +349,65 @@ const storeCreator = (set: any, get: any) => ({
         set({ error: "Generation failed. Please try again.", isGenerating: false });
       }
     }
-  },
+  }
 
-  cancelJob: async (id: string) => {
+  async function cancelJob(id: string) {
     try {
       await api.generations.cancel(id);
       set((state: any) => ({
-        queue: state.queue.map((j: GenerationJob) =>
+        queue: state.queue.map((j: any) =>
           j.id === id ? { ...j, status: "cancelled" } : j
         ),
       }));
     } catch (error) {
       console.error("Cancel failed:", error);
     }
-  },
+  }
 
-  retryJob: async (id: string) => {
+  async function retryJob(id: string) {
     try {
       const response = await api.generations.retry(id);
       const newJob: GenerationJob = {
         id: response.id,
-        userId: "current_user",
-        projectId: undefined,
+        user_id: "current_user",
+        project_id: null,
+        media_type: "text_to_video",
+        model: "wan21",
+        original_prompt: "",
+        enhanced_prompt: "",
+        negative_prompt: "",
         status: "queued",
         progress: 0,
-        request: { parameters: {} } as any,
-        resultUrls: [],
-        thumbnailUrls: [],
-        createdAt: new Date().toISOString(),
+        input_asset_url: null,
+        mask_url: null,
+        first_frame_image_url: null,
+        last_frame_image_url: null,
+        output_asset_urls: [],
+        thumbnail_urls: [],
+        parameters: {} as any,
+        provider_job_id: null,
+        credit_cost: 0,
+        error_message: null,
+        failure_type: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        completed_at: null,
       };
       set((state: any) => ({ queue: [newJob, ...state.queue] }));
       get().startPolling(response.id);
     } catch (error) {
       console.error("Retry failed:", error);
     }
-  },
+  }
 
-  startPolling: (jobId: string) => {
+  function startPolling(jobId: string) {
     set({ isPolling: true });
 
     const poll = async () => {
       try {
         const job = await api.generations.get(jobId);
         set((state: any) => ({
-          queue: state.queue.map((j: GenerationJob) =>
+          queue: state.queue.map((j: any) =>
             j.id === jobId ? { ...j, ...job } : j
           ),
         }));
@@ -359,11 +424,13 @@ const storeCreator = (set: any, get: any) => ({
     };
 
     poll();
-  },
+  }
 
-  stopPolling: () => set({ isPolling: false }),
+  function stopPolling() {
+    set({ isPolling: false });
+  }
 
-  enhancePrompt: async () => {
+  async function enhancePrompt() {
     const state = get();
     if (!state.prompt.trim()) return;
 
@@ -388,16 +455,16 @@ const storeCreator = (set: any, get: any) => ({
       console.error("Enhancement failed:", error);
       set({ isEnhancing: false, error: "Failed to enhance prompt" });
     }
-  },
+  }
 
-  applyEnhancedPrompt: () => {
+  function applyEnhancedPrompt() {
     const state = get();
     if (state.enhancedPrompt) {
       set({ prompt: state.enhancedPrompt.enhanced_prompt });
     }
-  },
+  }
 
-  detectWorkflow: async () => {
+  async function detectWorkflow() {
     const state = get();
     if (!state.prompt.trim() || state.prompt.trim().length < 3) {
       set({ workflowRecommendation: null });
@@ -408,8 +475,6 @@ const storeCreator = (set: any, get: any) => ({
 
     try {
       const hasCharacterAsset = !!state.assets.character.url;
-      const hasLocationAsset = !!state.assets.location.url;
-      const hasProductAsset = !!state.assets.product.url;
 
       const response = await api.workflows.select({
         prompt: state.prompt,
@@ -429,13 +494,13 @@ const storeCreator = (set: any, get: any) => ({
       console.error("Workflow detection failed:", error);
       set({ isDetectingWorkflow: false });
     }
-  },
+  }
 
-  clearEnhancement: () => {
+  function clearEnhancement() {
     set({ enhancedPrompt: null, workflowRecommendation: null });
-  },
+  }
 
-  debouncedDetectWorkflow: () => {
+  function debouncedDetectWorkflow() {
     const state = get();
     if (state.debounceTimer) {
       clearTimeout(state.debounceTimer);
@@ -444,7 +509,45 @@ const storeCreator = (set: any, get: any) => ({
       get().detectWorkflow();
     }, 500);
     set({ debounceTimer: timer });
-  },
-});
+  }
 
-export const useCreateStore = create<any>(storeCreator);
+  return {
+    ...initial,
+    setActiveTab,
+    setSelectedEffectId,
+    setPrompt,
+    setModelId,
+    setAsset,
+    setResolution,
+    setAspectRatio,
+    setQuality,
+    setSteps,
+    setGuidanceScale,
+    setSeed,
+    setStrength,
+    setDurationSeconds,
+    setFps,
+    setMotionStrength,
+    setCameraMotion,
+    setNumOutputs,
+    setError,
+    addToQueue,
+    updateJob,
+    removeFromQueue,
+    clearQueue,
+    resetForm,
+    uploadAsset,
+    generate,
+    cancelJob,
+    retryJob,
+    startPolling,
+    stopPolling,
+    enhancePrompt,
+    applyEnhancedPrompt,
+    detectWorkflow,
+    clearEnhancement,
+    debouncedDetectWorkflow,
+  };
+}
+
+export const useCreateStore = create<CreateState>()(createSlice);

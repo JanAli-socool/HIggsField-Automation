@@ -19,7 +19,7 @@ export interface Model {
   name: string;
   tagline: string;
   thumbnailUrl: string;
-  capabilities: ModelCapability[];
+  capabilities: string[];
   maxDuration: string;
   resolution: string;
   priceTier: "free" | "pro" | "enterprise";
@@ -36,6 +36,12 @@ export type ModelCapability =
   | "real-time"
   | "upscale";
 
+export interface CategoryItem {
+  id: string;
+  label: string;
+  count: number;
+}
+
 export interface Asset {
   type: "character" | "location" | "product";
   file: File | null;
@@ -43,86 +49,31 @@ export interface Asset {
   url: string | null;
 }
 
-export interface GenerationRequest {
-  mode: "prompt" | "template";
-  prompt: string;
-  modelId: string;
-  effectId?: string;
-  assets: {
-    character: Asset;
-    location: Asset;
-    product: Asset;
-  };
-  resolution: "720p" | "1080p" | "4k";
-  aspectRatio: "16:9" | "9:16" | "1:1";
-  quality?: "preview" | "standard" | "high";
-  steps?: number;
-  guidanceScale?: number;
-  seed?: number | null;
-  strength?: number;
-  durationSeconds?: number;
-  fps?: number;
-  motionStrength?: number;
-  cameraMotion?: string;
-  numOutputs?: number;
-  projectId?: string;
-  parameters?: any;
+export interface AssetUploadResponse {
+  url: string;
+  thumbnails: string[];
+  expires_at: string;
+  size: number;
+  width?: number;
+  height?: number;
 }
 
-export interface GenerationJob {
+export interface Category {
   id: string;
-  request: GenerationRequest;
-  status: "queued" | "processing" | "completed" | "failed" | "cancelled";
-  progress: number;
-  resultUrl?: string;
-  resultUrls?: string[];
-  thumbnailUrls?: string[];
-  createdAt: string;
-  errorMessage?: string;
-  failureType?: string;
-  userId?: string;
-  projectId?: string;
-  user_id?: string;
-  project_id?: string;
-  result_urls?: string[];
-  thumbnail_urls?: string[];
-  created_at?: string;
-  error_message?: string;
-  failure_type?: string;
-}
-
-export type Category =
-  | "all"
-  | "trending"
-  | "motion"
-  | "transform"
-  | "surreal"
-  | "cinematic"
-  | "commercial"
-  | "character";
-
-export interface CategoryItem {
-  id: Category;
   label: string;
   count: number;
 }
 
-// Re-export API types for convenience
-export type {
-  MediaType,
-  ImageModel,
-  VideoModel,
-  AspectRatio,
-  Quality,
-  CameraMotion,
-  JobStatus,
-  FailureType,
+// Re-export API types
+export {
+  GenerationRequest,
   GenerationParameters,
-  GenerationRequest as ApiGenerationRequest,
-  GenerationJob as ApiGenerationJob,
+  ValidationResult,
+  GenerationJob,
   GenerationJobListItem,
   PaginatedResponse,
-  ValidationResult,
+  ApiError,
+  ApiResponse,
   UploadResponse,
   CreditBalance,
   CreditCosts,
@@ -132,6 +83,24 @@ export type {
   EnhancePromptResponse,
   WorkflowSelectRequest,
   WorkflowSelectResponse,
-  ApiError,
-  ApiResponse,
-} from "./api";
+  MediaType,
+  Model as ApiModel,
+  AspectRatio,
+  Quality,
+  CameraMotion,
+  JobStatus,
+  FailureType,
+} from "./api.js";
+
+// Data exports - only from effects.ts to avoid duplicates
+export {
+  effects,
+  featuredEffects,
+  categories,
+} from "../data/effects.js";
+
+export {
+  models as modelData,
+  capabilityLabels,
+  capabilityColors,
+} from "../data/models.js";
