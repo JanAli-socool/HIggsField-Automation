@@ -1,9 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ApiResponse, ApiError } from "@/types/api.js";
-import bcrypt from "bcryptjs";
-import { login, logout, me, register, verifyEmail, forgotPassword, resetPassword } from "@/lib/auth/controller.js";
-import { validateRequest } from "@/lib/auth/middleware.js";
-import { loginSchema, registerSchema, verifyEmailSchema, forgotPasswordSchema, resetPasswordSchema } from "@/lib/auth/validators.js";
+import { ApiResponse, ApiError } from "../../src/types/api.js";
+import { login, logout, me, register, verifyEmail, forgotPassword, resetPassword } from "../../src/lib/auth/controller.js";
+import { validateRequest } from "../../src/lib/auth/middleware.js";
+import { loginSchema, registerSchema, verifyEmailSchema, forgotPasswordSchema, resetPasswordSchema } from "../../src/lib/auth/validators.js";
 
 function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;

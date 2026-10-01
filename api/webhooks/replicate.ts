@@ -31,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const job = await prisma.generation.findFirst({
-      where: { providerJobId: id },
+      where: { provider_job_id: id },
     });
 
     if (!job) {
@@ -53,18 +53,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const updateData: any = {
       status: newStatus,
       progress,
-      updatedAt: new Date(),
+      updated_at: new Date(),
     };
 
     if (status === "succeeded" && output) {
-      updateData.outputAssetUrls = Array.isArray(output) ? output : [output];
-      updateData.thumbnailUrls = Array.isArray(output) ? output : [output];
-      updateData.completedAt = new Date();
+      updateData.output_asset_urls = Array.isArray(output) ? output : [output];
+      updateData.thumbnail_urls = Array.isArray(output) ? output : [output];
+      updateData.completed_at = new Date();
     }
 
     if (status === "failed" && error) {
-      updateData.errorMessage = error;
-      updateData.failureType = "generation_failed";
+      updateData.error_message = error;
+      updateData.failure_type = "generation_failed";
     }
 
     await prisma.generation.update({

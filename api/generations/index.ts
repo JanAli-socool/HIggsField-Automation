@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GenerationRequest, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "@/types/api.js";
-import { validateGeneration, submitGeneration, getGenerationStatus } from "@/lib/providers/registry.js";
-import prisma from "@/lib/db/client.js";
+import { GenerationRequest, GenerationJobListItem, PaginatedResponse, ApiResponse, ApiError } from "../../src/types/api.js";
+import { validateGeneration, submitGeneration, getGenerationStatus } from "../../src/lib/providers/registry.js";
+import prisma from "../../src/lib/db/client.js";
 import { v4 as uuidv4 } from "uuid";
-import { withAuth, AuthenticatedRequest } from "@/lib/auth/apiMiddleware.js";
+import { withAuth, AuthenticatedRequest } from "../../src/lib/auth/apiMiddleware.js";
 
 const PLACEHOLDER_VIDEOS = [
   "https://assets.mixkit.co/videos/preview/mixkit-clouds-moving-in-the-sky-time-lapse-1189-large.mp4",
